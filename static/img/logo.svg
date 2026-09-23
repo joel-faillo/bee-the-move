@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 220" role="img" aria-labelledby="title description">
+  <title id="title">Bee the Move</title>
+  <desc id="description">A rounded bee surrounded by three small pink flowers.</desc>
+  <g transform="translate(14 12)" stroke="#173D35" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+    <ellipse cx="82" cy="60" rx="45" ry="33" fill="#DCEDE7" transform="rotate(-25 82 60)"/>
+    <ellipse cx="150" cy="60" rx="45" ry="33" fill="#DCEDE7" transform="rotate(25 150 60)"/>
+    <ellipse cx="116" cy="112" rx="51" ry="62" fill="#F5C344"/>
+    <path d="M70 99h92M68 126h96" fill="none"/>
+    <circle cx="116" cy="43" r="27" fill="#173D35"/>
+    <path d="M103 24L91 7M129 24l12-17" fill="none"/>
+  </g>
+  <g stroke="#173D35" stroke-width="3.5" stroke-linejoin="round">
+    <g transform="translate(61 160) rotate(-12)"><ellipse cx="0" cy="-11" rx="7" ry="11" fill="#F3A0B8"/><ellipse cx="10" cy="-3" rx="7" ry="11" fill="#F3A0B8" transform="rotate(72 10 -3)"/><ellipse cx="6" cy="9" rx="7" ry="11" fill="#F3A0B8" transform="rotate(144 6 9)"/><ellipse cx="-6" cy="9" rx="7" ry="11" fill="#F3A0B8" transform="rotate(216 -6 9)"/><ellipse cx="-10" cy="-3" rx="7" ry="11" fill="#F3A0B8" transform="rotate(288 -10 -3)"/><circle cx="0" cy="0" r="6" fill="#F5C344"/></g>
+    <g transform="translate(203 148) rotate(14) scale(.82)"><ellipse cx="0" cy="-11" rx="7" ry="11" fill="#F7B2C6"/><ellipse cx="10" cy="-3" rx="7" ry="11" fill="#F7B2C6" transform="rotate(72 10 -3)"/><ellipse cx="6" cy="9" rx="7" ry="11" fill="#F7B2C6" transform="rotate(144 6 9)"/><ellipse cx="-6" cy="9" rx="7" ry="11" fill="#F7B2C6" transform="rotate(216 -6 9)"/><ellipse cx="-10" cy="-3" rx="7" ry="11" fill="#F7B2C6" transform="rotate(288 -10 -3)"/><circle cx="0" cy="0" r="6" fill="#F5C344"/></g>
+    <g transform="translate(207 73) rotate(18) scale(.58)"><ellipse cx="0" cy="-11" rx="7" ry="11" fill="#EF8EAD"/><ellipse cx="10" cy="-3" rx="7" ry="11" fill="#EF8EAD" transform="rotate(72 10 -3)"/><ellipse cx="6" cy="9" rx="7" ry="11" fill="#EF8EAD" transform="rotate(144 6 9)"/><ellipse cx="-6" cy="9" rx="7" ry="11" fill="#EF8EAD" transform="rotate(216 -6 9)"/><ellipse cx="-10" cy="-3" rx="7" ry="11" fill="#EF8EAD" transform="rotate(288 -10 -3)"/><circle cx="0" cy="0" r="6" fill="#F5C344"/></g>
+  </g>
+</svg>
