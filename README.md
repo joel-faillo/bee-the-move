@@ -114,7 +114,7 @@ The output estimates seasonal timing, not field-level flowering or nectar.
 | [BLV stock-control instructions](https://www.blv.admin.ch/dam/de/sd-web/dQWh4Q6Qxpng/anleitung-fuehren-bestandeskontrolle-bienen-de.pdf) | Official instructions, published 24 June 2026 |
 | Official cantonal bee/veterinary pages | Current local procedure, contacts and restriction-zone entry points for all 26 cantons |
 | [BienenSchweiz site agreement](https://bienen.ch/wp-content/uploads/2022/11/Mustervereinbarung_fuer_Platz_fuer_Bienenhaltung_Formular.pdf) | Original interactive land-use agreement |
-| [openrouteservice](https://openrouteservice.org/dev/) | Optional road route |
+| [openrouteservice / HeiGIT](https://openrouteservice.org/dev/) | Optional road route through the current `api.heigit.org` endpoint |
 
 The 26 official cantonal entry points and the encoded local differences were
 checked on 28 September 2026 and are listed directly in

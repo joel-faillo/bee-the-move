@@ -11,7 +11,8 @@ from __future__ import annotations
 
 from services.http import HttpClient
 
-ORS_URL = "https://api.openrouteservice.org/v2/directions/driving-car/geojson"
+# HeiGIT replaced the former api.openrouteservice.org host in 2026.
+ORS_URL = "https://api.heigit.org/openrouteservice/v2/directions/driving-car/geojson"
 
 
 class RoutingService:
