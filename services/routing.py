@@ -2,6 +2,9 @@
 
 When an API key is configured, road distance replaces straight-line distance
 only in the 10% logistics component. It never changes biological suitability.
+
+AI assistance: OpenAI Codex supported drafting and review. See
+``AI_ASSISTANCE.md`` for scope, prompts and the full citation.
 """
 
 from __future__ import annotations

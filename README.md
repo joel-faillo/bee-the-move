@@ -50,9 +50,9 @@ Without a key, the app clearly uses direct Haversine distance.
    details in the same page.
 6. Download prefilled copies of the original BienenSchweiz site agreement and
    original BLV stock-control form.
-7. Review a movement-notification email prepared for the competent canton. For
-   cross-canton moves, both origin and destination contacts are provided; the
-   text switches between German, French and Italian where appropriate.
+7. Review the official guidance for the detected origin and destination
+   cantons. The app prepares a German, French or Italian email **requesting
+   confirmation** of the procedure; it is not itself a notification or permit.
 
 Signatures remain blank. The user must review the generated files, contact the
 competent bee inspectors, check current restriction zones, and complete any
@@ -112,9 +112,17 @@ The output estimates seasonal timing, not field-level flowering or nectar.
 | [BLV bee guidance](https://www.blv.admin.ch/de/bienen) | Registration, identification and movement rules |
 | [BLV stock-control template](https://www.blv.admin.ch/dam/de/sd-web/keeNTCMwOYVC/vorlage-bestandeskontrolle-bienenvoelker-de.docx) | Original federal Word form, published 21 April 2026 |
 | [BLV stock-control instructions](https://www.blv.admin.ch/dam/de/sd-web/dQWh4Q6Qxpng/anleitung-fuehren-bestandeskontrolle-bienen-de.pdf) | Official instructions, published 24 June 2026 |
-| [BLV cantonal directory](https://www.blv.admin.ch/dam/blv/de/dokumente/import-export/import/adressliste-kantonalen-veterinaeraemter-db.pdf.download.pdf/Adressliste%20der%20kantonalen%20Veterinaeraemter.pdf) | Official canton routing; directory itself is dated 30 July 2024 |
+| Official cantonal bee/veterinary pages | Current local procedure, contacts and restriction-zone entry points for all 26 cantons |
 | [BienenSchweiz site agreement](https://bienen.ch/wp-content/uploads/2022/11/Mustervereinbarung_fuer_Platz_fuer_Bienenhaltung_Formular.pdf) | Original interactive land-use agreement |
 | [openrouteservice](https://openrouteservice.org/dev/) | Optional road route |
+
+The 26 official cantonal entry points and the encoded local differences were
+checked on 28 September 2026 and are listed directly in
+`services/compliance.py`. Important differences include advance-notice periods
+in Basel-Landschaft, Fribourg and Graubünden, the permit regime in Glarus, the
+internal-canton exception in Neuchâtel, and clearance requirements in Ticino.
+Temporary restriction zones can change at any time, so the app always links to
+the deciding official source instead of claiming automatic legal clearance.
 
 The two original templates are bundled in `static/forms/` so downloads remain
 reliable. They were fetched from the official links and checked on 22 September
@@ -148,17 +156,26 @@ python -m pytest -q
 ```
 
 Tests cover the score, distance, elevation bounds, origin retention, canton
-detection, map evidence controls, model inference, all 26 canton contacts,
-multilingual notifications, and preservation of the original PDF/Word source
-files and structures while filling copies.
+detection, map evidence controls, model inference, all 26 official cantonal
+sources and key local differences, multilingual request drafts, and
+preservation of the original PDF/Word source files and structures while filling
+copies.
 
 ## Course submission checklist
 
 - Replace the five placeholders in `CONTRIBUTIONS.md` with the real work.
-- Update `AI_ASSISTANCE.md` to match the final use and exact HSG citation rules.
+- Review `AI_ASSISTANCE.md`, retain the relevant prompts and include Codex in
+  the declaration of aids and the video reflection.
 - Include the signed declaration of authorship.
 - Demonstrate the working app, interaction, visualisations and ML model in a
   human-narrated video of no more than four minutes.
 - Upload the actual deliverables, not only external links.
 
 Source attribution for MeteoSwiss data: **Source: MeteoSwiss**.
+
+## AI assistance
+
+OpenAI Codex supported code drafting, review, testing and documentation. The
+scope, representative prompts, human verification responsibilities and a
+report-ready reference are recorded in [`AI_ASSISTANCE.md`](AI_ASSISTANCE.md).
+AI was used as an aid, not as a source for scientific or regulatory claims.

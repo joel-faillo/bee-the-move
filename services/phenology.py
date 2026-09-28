@@ -3,6 +3,9 @@
 This is observation data, not an official site-level flowering forecast. The
 app therefore reports a flowering *signal*: three nearby stations, the current
 season when available, and a ten-year median for gaps.
+
+AI assistance: OpenAI Codex supported drafting and review. See
+``AI_ASSISTANCE.md`` for scope, prompts and the full citation.
 """
 
 from __future__ import annotations

@@ -2,6 +2,9 @@
 
 Only four explainable components receive weight. Pollen and elevation remain
 visible context but never enter this calculation.
+
+AI assistance: OpenAI Codex supported drafting and review. See
+``AI_ASSISTANCE.md`` for scope, prompts and the full citation.
 """
 
 from __future__ import annotations

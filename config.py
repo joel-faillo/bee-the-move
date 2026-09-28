@@ -1,4 +1,8 @@
-"""Environment-only runtime settings; scientific assumptions live in code."""
+"""Environment-only runtime settings; scientific assumptions live in code.
+
+AI assistance: OpenAI Codex supported drafting and review. See
+``AI_ASSISTANCE.md`` for scope, prompts and the full citation.
+"""
 
 from __future__ import annotations
 

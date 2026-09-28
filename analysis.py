@@ -3,6 +3,9 @@
 Service modules fetch and normalise one source each; ``beescore.py`` contains
 the pure scoring rules. This separation keeps every score component inspectable
 and testable.
+
+AI assistance: OpenAI Codex supported drafting and review. See
+``AI_ASSISTANCE.md`` for scope, prompts and the full citation.
 """
 
 from __future__ import annotations
@@ -50,13 +53,23 @@ class BeeMoveAnalysis:
 
     def run(
         self,
-        location: str,
+        location: str | dict,
         radius_km: float,
         forage_preference: str | None = None,
         elevation_preference: str = "Any elevation",
     ) -> dict:
         """Run the analysis and always retain the searched origin area."""
-        origin = self.geo.geocode(location)
+        # The autocomplete already resolves one exact GeoAdmin result. Reuse
+        # those coordinates so an ambiguous label is not searched and ranked
+        # a second time (for example Lausanne versus Belmont-sur-Lausanne).
+        if isinstance(location, dict):
+            origin = {
+                "name": location.get("label") or location.get("name"),
+                "lat": float(location["lat"]),
+                "lon": float(location["lon"]),
+            }
+        else:
+            origin = self.geo.geocode(location)
         points = self.forecast.candidates(
             origin["lat"], origin["lon"], radius_km, self.max_candidates
         )

@@ -87,6 +87,35 @@ def test_searched_place_is_zero_km_but_keeps_forecast_reference_distance():
     assert result["height_source"] == "geoadmin"
 
 
+def test_selected_autocomplete_coordinates_are_not_geocoded_again():
+    class GeoThatMustNotSearch(StubGeo):
+        def geocode(self, _location):
+            raise AssertionError("The selected GeoAdmin result must be reused")
+
+    analysis = BeeMoveAnalysis(
+        geo=GeoThatMustNotSearch(),
+        forecast=StubForecast(),
+        phenology=StubPhenology(),
+        landscape=StubLandscape(),
+        pollen=StubPollen(),
+        routing=StubRouting(),
+        max_candidates=3,
+    )
+    selected = {
+        "label": "Lausanne (VD)",
+        "lat": 46.52865,
+        "lon": 6.63852,
+    }
+
+    result = analysis.run(selected, 50)
+
+    assert result["origin"] == {
+        "name": "Lausanne (VD)",
+        "lat": 46.52865,
+        "lon": 6.63852,
+    }
+
+
 def test_elevation_filter_is_explicit_and_bounded():
     assert _matches_elevation(450, "Below 600 m")
     assert not _matches_elevation(700, "Below 600 m")

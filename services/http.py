@@ -2,6 +2,9 @@
 
 Retries absorb brief upstream failures; the small in-memory cache avoids
 re-downloading large national CSV files during repeated analyses.
+
+AI assistance: OpenAI Codex supported drafting and review. See
+``AI_ASSISTANCE.md`` for scope, prompts and the full citation.
 """
 
 from __future__ import annotations

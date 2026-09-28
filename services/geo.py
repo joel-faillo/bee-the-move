@@ -1,3 +1,9 @@
+"""GeoAdmin place search, terrain height, canton lookup and distance maths.
+
+AI assistance: OpenAI Codex supported drafting and review. See
+``AI_ASSISTANCE.md`` for scope, prompts and the full citation.
+"""
+
 from __future__ import annotations
 
 import html

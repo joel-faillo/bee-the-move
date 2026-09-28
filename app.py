@@ -1,8 +1,9 @@
 """Bee the Move - one guided Streamlit workflow.
 
-AI assistance citation: OpenAI Codex helped draft and revise this interface on
-22 September 2026. The project team must review the code and describe that use
-in the submitted video and list of aids. See ``AI_ASSISTANCE.md``.
+AI assistance citation: OpenAI Codex helped draft and revise this interface
+between 21 and 28 September 2026. The project team must review the code and
+describe that use in the submitted video and list of aids. See
+``AI_ASSISTANCE.md`` for prompts, scope and the full reference.
 """
 
 from __future__ import annotations
@@ -84,6 +85,7 @@ def _style() -> None:
         .block-container { max-width: 1220px; padding-top: 2rem; }
         h1, h2, h3 { color: var(--bee-green); letter-spacing: -0.025em; }
         [data-testid="stMetric"] { border:1px solid #e5e7e6; border-radius:10px; padding:.75rem 1rem; }
+        [data-testid="stMetricValue"] { font-size:2rem; }
         .hero-copy { font-size:1.08rem; color:#4b5563; max-width:760px; margin-top:-.4rem; }
         .step { border-left:4px solid var(--bee-yellow); padding:.25rem 0 .25rem .8rem; min-height:68px; }
         .source-note { color:#647067; font-size:.86rem; }
@@ -159,7 +161,7 @@ def _search(analysis: BeeMoveAnalysis) -> None:
         try:
             with st.spinner("Comparing current Swiss public data…"):
                 result = analysis.run(
-                    selected["search_text"], float(radius),
+                    selected, float(radius),
                     None if forage_choice == "Balanced mix" else forage_choice,
                     elevation_choice,
                 )
@@ -474,11 +476,20 @@ def _move_preparation(analysis: BeeMoveAnalysis, result: dict, destination: dict
         contact_rows = [origin_office]
         if (office["canton"], office["email"]) != (origin_office["canton"], origin_office["email"]):
             contact_rows.append(office)
-        st.dataframe(
-            pd.DataFrame(contact_rows)[["canton", "office", "email", "source_date"]],
-            hide_index=True, width="stretch",
+        for item in contact_rows:
+            st.markdown(f"**{item['canton']} · {item['office']}**")
+            if item["email"]:
+                st.caption(f"Contact: {item['email']}")
+            for note in item["notes"]:
+                st.write(f"- {note}")
+            st.link_button(
+                f"Open official {item['canton']} guidance",
+                item["source_url"],
+            )
+        st.caption(
+            "Cantonal pages were checked on 28 September 2026. Temporary restriction zones and contacts can change, "
+            "so the official page remains the deciding source."
         )
-        st.caption("The contacts change automatically when the selected result is in another canton. Verify the current inspector with these services.")
         links = st.columns(4)
         links[0].link_button("BLV bee rules", FSVO_BEES_URL, width="stretch")
         links[1].link_button("Cantonal directory", VETERINARY_DIRECTORY_URL, width="stretch")
@@ -487,10 +498,10 @@ def _move_preparation(analysis: BeeMoveAnalysis, result: dict, destination: dict
 
 
 def _health_notification(data: dict, origin_office: dict, destination_office: dict) -> None:
-    """Prepare—not send—a complete notification to the competent office."""
-    st.subheader("4 · Health / movement notification")
+    """Prepare—not send—a review request for the competent authority."""
+    st.subheader("4 · Movement review request")
     st.write(
-        "Switzerland has no single nationwide clearance form for every move. The app therefore prepares a complete email for the competent service; you review it and send it yourself."
+        "Switzerland has no single nationwide clearance form for every move. The app prepares an email draft so the competent authority can confirm the current procedure. It is not an official submission or permit."
     )
     offices = [origin_office]
     if (destination_office["canton"], destination_office["email"]) != (
@@ -501,7 +512,7 @@ def _health_notification(data: dict, origin_office: dict, destination_office: di
     for item in offices:
         subject, body = notification_copy(data, item["canton"])
         st.text_area(
-            f"Prepared message for {item['canton']} — review before sending",
+            f"Draft request for {item['canton']} — review before sending",
             body, height=300, key=f"health-message-{item['canton']}",
         )
         if "@" in item["email"]:
@@ -515,7 +526,7 @@ def _health_notification(data: dict, origin_office: dict, destination_office: di
         st.warning("The competent email could not be resolved. Use the official cantonal directory above.")
     st.caption(
         "The BLV requires notification to the bee inspector of the old and new inspection districts. "
-        "These canton-specific contacts help route the request; Bee the Move does not send it or confirm clearance."
+        "The linked canton-specific rule can be stricter. Bee the Move does not send the message or confirm clearance."
     )
 
 

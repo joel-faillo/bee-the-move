@@ -3,6 +3,9 @@
 Declared feature area is weighted by an explicit forage category and by
 distance in 1, 2 and 3 km rings. This is a prototype resource index, not an
 official nectar-yield prediction.
+
+AI assistance: OpenAI Codex supported drafting and review. See
+``AI_ASSISTANCE.md`` for scope, prompts and the full citation.
 """
 
 from __future__ import annotations

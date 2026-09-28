@@ -1,4 +1,8 @@
-"""MapLibre map embedded in Streamlit with the official swisstopo style."""
+"""MapLibre map embedded in Streamlit with the official swisstopo style.
+
+AI assistance: OpenAI Codex supported drafting and review. See
+``AI_ASSISTANCE.md`` for scope, prompts and the full citation.
+"""
 
 from __future__ import annotations
 
@@ -99,8 +103,10 @@ def map_html(result: dict, selected_name: str | None = None) -> str:
 <style>
 html,body,#map{{height:100%;margin:0}}
 .maplibregl-popup-content{{font:14px system-ui;padding:9px 12px}}
-.layers{{font:13px system-ui;background:#fff;padding:10px 12px;border-radius:6px;box-shadow:0 1px 4px #0004;min-width:190px}}
-.layers strong{{display:block;margin-bottom:6px}} .layers label{{display:block;margin:5px 0;cursor:pointer}}
+.layers{{font:13px system-ui}}
+.layer-toggle{{background:#fff;border:0;border-radius:6px;box-shadow:0 1px 4px #0004;padding:9px 12px;font-weight:650;cursor:pointer}}
+.layer-options{{background:#fff;margin-top:6px;padding:10px 12px;border-radius:6px;box-shadow:0 1px 4px #0004;min-width:190px}}
+.layer-options label{{display:block;margin:5px 0;cursor:pointer}}
 .layers select{{width:100%;margin-top:5px;padding:4px;border:1px solid #cbd5ce;border-radius:4px}}
 </style>
 </head><body><div id="map"></div>
@@ -113,13 +119,21 @@ class LayerControl {{
   onAdd(map) {{
     this.map=map; this.container=document.createElement('div');
     this.container.className='maplibregl-ctrl layers';
-    this.container.innerHTML=`<strong>Map layers</strong>
-      <label><input type="checkbox" data-layer="candidates" checked> Recommended areas</label>
-      <label><input type="checkbox" data-layer="radius-line,radius-fill" checked> Search radius</label>
-      <label><input type="checkbox" data-layer="phenology" checked> Phenology station</label>
-      <label><input type="checkbox" data-layer="forage"> Agricultural forage points</label>
-      <label><input type="checkbox" data-layer="pollen"> Pollen station</label>
-      <select id="forage-category"><option value="">All forage categories</option></select>`;
+    this.container.innerHTML=`<button type="button" class="layer-toggle" aria-expanded="false">Map layers</button>
+      <div class="layer-options" hidden>
+        <label><input type="checkbox" data-layer="candidates" checked> Recommended areas</label>
+        <label><input type="checkbox" data-layer="radius-line,radius-fill" checked> Search radius</label>
+        <label><input type="checkbox" data-layer="phenology" checked> Phenology station</label>
+        <label><input type="checkbox" data-layer="forage"> Agricultural forage points</label>
+        <label><input type="checkbox" data-layer="pollen"> Pollen station</label>
+        <select id="forage-category"><option value="">All forage categories</option></select>
+      </div>`;
+    const toggle=this.container.querySelector('.layer-toggle');
+    const options=this.container.querySelector('.layer-options');
+    toggle.addEventListener('click',()=>{{
+      const expanded=toggle.getAttribute('aria-expanded')==='true';
+      toggle.setAttribute('aria-expanded',String(!expanded)); options.hidden=expanded;
+    }});
     const select=this.container.querySelector('#forage-category');
     for (const category of data.forageCategories) {{
       const option=document.createElement('option'); option.value=category; option.textContent=category; select.appendChild(option);

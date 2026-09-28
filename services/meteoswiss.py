@@ -4,6 +4,9 @@ The STAC collection stores one national CSV per parameter. This adapter keeps
 only requested points and derives flight suitability from hourly temperature,
 rain, wind, gusts and global radiation. Radiation avoids double-counting
 correlated sunshine and cloud information.
+
+AI assistance: OpenAI Codex supported drafting and review. See
+``AI_ASSISTANCE.md`` for scope, prompts and the full citation.
 """
 
 from __future__ import annotations

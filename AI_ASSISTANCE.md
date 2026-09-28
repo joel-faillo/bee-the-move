@@ -1,31 +1,59 @@
 # AI assistance record
 
-This repository contains code drafted with assistance from **OpenAI Codex** on
-21-22 September 2026. AI was used to restructure the original Flask prototype as
-a Streamlit application, implement the flowering model, draft tests, generate
-the nationwide official-source workflow, fill copies of the official
-templates, and improve documentation.
+## Tool and purpose
 
-Representative instruction supplied to the tool:
+The team used **OpenAI Codex** as a programming aid between 21 and
+28 September 2026. Codex helped restructure an earlier Flask prototype as a
+Streamlit application, draft and review Python code, prepare tests, improve
+documentation, and audit the interface and the official-source workflow.
 
-> Convert Bee the Move to a simple, readable Streamlit project that satisfies
-> the course requirements. Train and use an explainable model on official
-> MeteoSwiss phenology data, retain the useful Swiss public-data integrations,
-> and add nationwide hive-movement planning linked to original official forms.
+AI was not treated as a factual source. Claims about MeteoSwiss, GeoAdmin,
+federal forms and cantonal procedures were checked against the official links
+recorded in the code and README. Generated suggestions were reviewed and
+tested by the project team before inclusion.
 
-Files with substantial AI-drafted additions include `app.py`,
-`ml/flowering_model.py`, `services/compliance.py`,
-`services/official_documents.py`, `ui/map.py`, the tests and this
-documentation. Earlier adapters and scoring
-code were also developed with AI assistance during the same project workflow.
+## Representative prompts
 
-Before submission the student team must:
+The working conversation included instructions such as:
 
-1. review and understand every submitted file;
-2. correct this record if the final workflow changes;
-3. include OpenAI Codex in the list of aids shown in the video;
-4. follow the exact HSG citation wording linked from Canvas;
-5. explain which decisions and code were produced or revised by the team.
+> Rebuild Bee the Move as a simple and readable Swiss-wide application. Use
+> official, current APIs; train an explainable flowering model; distinguish
+> observations, model output and heuristics; and keep the code modular.
 
-This file is a transparent project record, not a substitute for the official
-HSG declaration of authorship.
+> Add location autocomplete, useful filters, the nearest phenology station,
+> official map layers, and a guided workflow that fills copies of the original
+> forms without changing their clauses.
+
+> Audit every canton using official sources, remove unnecessary complexity,
+> test every relevant function, and document AI use according to the course
+> requirements.
+
+## Affected code
+
+Substantial AI-assisted drafting or revision appears in `app.py`,
+`analysis.py`, `beescore.py`, `ml/flowering_model.py`, `services/`, `ui/map.py`,
+the automated tests, and the project documentation. Those modules point back
+to this record in their source comments. The trained model uses official
+MeteoSwiss observations; Codex did not supply its training values or results.
+
+The team remains responsible for:
+
+1. understanding and explaining every submitted file;
+2. verifying source claims and correcting errors;
+3. deciding which suggestions to accept, simplify or reject;
+4. entering the real team contributions in `CONTRIBUTIONS.md`;
+5. naming Codex in the declaration of aids and reflecting on its use in the
+   human-narrated project video.
+
+## Suggested in-text citation and reference
+
+For an accompanying report or methods section, describe the use in prose and
+cite it as **(OpenAI, 2026)** where AI-assisted content is reproduced.
+
+> OpenAI. (2026). *Codex* (accessed 28 September 2026) [Large language model].
+> https://openai.com/codex/
+
+This record follows the course slides and the HSG “Writing with AI” guidance:
+AI must be listed as an aid, AI-supported code must be identifiable, and the
+team—not the model—must verify factual content and document its own work. This
+file does not replace the required declaration of authorship.

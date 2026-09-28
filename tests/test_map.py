@@ -36,3 +36,5 @@ def test_map_explains_and_controls_context_layers():
     assert "Pollen station" in html
     assert "All forage categories" in html
     assert "Meadows" in html
+    assert 'class="layer-options" hidden' in html
+    assert 'aria-expanded="false"' in html
