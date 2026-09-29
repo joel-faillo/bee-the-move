@@ -10,7 +10,6 @@ from services.official_documents import fill_land_agreement, fill_stock_control
 from services.official_documents import (
     AUTHORSHIP_DECLARATION,
     LAND_AGREEMENT_TEMPLATE,
-    STOCK_CONTROL_TEMPLATE,
     STOCK_CONTROL_TEMPLATES,
 )
 

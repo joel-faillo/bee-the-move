@@ -1,23 +1,30 @@
+from datetime import date
+
 from streamlit.testing.v1 import AppTest
 
 from app import (
-    COMPENSATION_PERIOD_OPTIONS,
-    DOCUMENT_LANGUAGE_OPTIONS,
-    DURATION_OPTIONS,
     ELEVATION_OPTIONS,
     FORAGE_OPTIONS,
-    INSTALLATION_OPTIONS,
-    NOTICE_PERIOD_OPTIONS,
-    NOTICE_TIMING_OPTIONS,
     RADIUS_OPTIONS,
-    SITE_PLAN_OPTIONS,
     _candidate_summary,
     _format_display_date,
     _location_suggestions,
-    _document_language_for_canton,
+    _missing_evidence,
     _postcode_and_town,
     _safe_canton,
     _source_timestamp,
+)
+from ui.move_form import (
+    COMPENSATION_PERIOD_OPTIONS,
+    DOCUMENT_LANGUAGE_OPTIONS,
+    DURATION_OPTIONS,
+    INSTALLATION_OPTIONS,
+    NOTICE_PERIOD_OPTIONS,
+    NOTICE_TIMING_OPTIONS,
+    SITE_PLAN_OPTIONS,
+    coordinates_in_swiss_bounds,
+    document_language_for_canton,
+    validate_move_form,
 )
 
 
@@ -26,6 +33,8 @@ def _form_app():
 
     class Geo:
         def canton(self, lat, lon):
+            if lat < 47:
+                return {"code": "TI", "name": "Ticino"}
             return {"code": "SG", "name": "St. Gallen"}
 
     class Analysis:
@@ -45,6 +54,44 @@ def _form_app():
 
 def _by_label(elements, label):
     return next(element for element in elements if element.label == label)
+
+
+def _complete_form(at, latitude=47.33, longitude=9.41):
+    agreement_values = {
+        "Name and surname *": "Anna Test",
+        "Street and number *": "Via 1",
+        "Postcode and town *": "9000 St. Gallen",
+        "Landowner name and address *": "Owner, Via 2",
+        "Property / parcel *": "Parcel 123",
+    }
+    for label, value in agreement_values.items():
+        _by_label(at.text_input, label).set_value(value).run()
+    _by_label(at.number_input, "Area (m²) *").set_value(100).run()
+    _by_label(at.number_input, "Exact destination latitude *").set_value(latitude).run()
+    _by_label(at.number_input, "Exact destination longitude *").set_value(longitude).run()
+    movement_values = {
+        "Destination apiary number *": "SG-2",
+        "Destination street / field address *": "Field 1",
+        "Origin apiary number *": "SG-1",
+    }
+    for label, value in movement_values.items():
+        _by_label(at.text_input, label).set_value(value).run()
+    _by_label(at.radio, "Installation on the site *").set_value(
+        "Hives without a bee house"
+    ).run()
+    _by_label(
+        at.radio, "Will a plan showing the site and access be attached? *"
+    ).set_value("No").run()
+    _by_label(at.radio, "Duration *").set_value("Open-ended").run()
+    _by_label(at.date_input, "Use begins *").set_value(date(2026, 10, 1)).run()
+    _by_label(at.date_input, "Planned move date *").set_value(
+        date(2026, 10, 2)
+    ).run()
+    _by_label(
+        at.checkbox,
+        "Required confirmation: I understand that I must review and sign the documents and complete any required cantonal notification.",
+    ).check().run()
+    return at
 
 
 def test_initial_page_exposes_every_search_option_without_errors():
@@ -193,9 +240,9 @@ def test_destination_address_and_document_language_defaults_are_explicit():
         "9000 St. Gallen"
     )
     assert _postcode_and_town({"name": "Appenzell"}) == "Appenzell"
-    assert _document_language_for_canton("TI") == "Italiano"
-    assert _document_language_for_canton("VD") == "Français"
-    assert _document_language_for_canton("SG") == "Deutsch"
+    assert document_language_for_canton("TI") == "Italiano"
+    assert document_language_for_canton("VD") == "Français"
+    assert document_language_for_canton("SG") == "Deutsch"
 
 
 def test_candidate_summary_distinguishes_road_and_direct_distance():
@@ -239,3 +286,89 @@ def test_canton_lookup_fails_without_inventing_a_result():
         geo = Geo()
 
     assert _safe_canton(Analysis(), {"lat": 47.4, "lon": 9.3}) is None
+
+
+def test_coordinate_bounds_and_partial_evidence_messages_are_explicit():
+    assert coordinates_in_swiss_bounds(46.95, 8.25)
+    assert not coordinates_in_swiss_bounds(0, 0)
+    missing = _missing_evidence(
+        {
+            "flowering": {"available": False},
+            "landscape": {"available": False},
+            "height_m": None,
+            "is_origin_area": False,
+            "route": None,
+        },
+        {"sources": {"openrouteservice": {"configured": True}}},
+    )
+    assert len(missing) == 4
+    assert any("flowering" in message for message in missing)
+    assert any("road route" in message for message in missing)
+
+
+def test_move_form_validation_catches_dependent_fields_and_date_order():
+    form = {
+        "beekeeper": "Anna",
+        "beekeeper_street": "Via 1",
+        "beekeeper_city": "9000 St. Gallen",
+        "landowner": "Owner, Via 2",
+        "parcel": "123",
+        "apiary_number": "SG-2",
+        "site_street": "Field 1",
+        "site_city": "9050 Appenzell",
+        "origin_apiary_number": "SG-1",
+        "movement_reason": "Verstellen",
+        "area_m2": 100,
+        "installation": "Other",
+        "other_installation": "",
+        "site_plan": "No",
+        "duration": "Fixed term",
+        "exact_latitude": 47.33,
+        "exact_longitude": 9.41,
+        "start_date": date(2026, 10, 2),
+        "end_date": date(2026, 10, 1),
+        "move_date": date(2026, 10, 3),
+        "notice_timing": "Any time",
+        "specified_notice_date": "",
+        "compensation": "",
+        "compensation_period": "Not selected",
+        "confirmation": True,
+    }
+    canton = {"code": "SG", "name": "St. Gallen"}
+
+    assert validate_move_form(form, canton) == "Describe the installation selected as Other."
+    form["other_installation"] = "Four hives"
+    assert "end date" in validate_move_form(form, canton)
+    form["end_date"] = date(2026, 10, 5)
+    form["notice_timing"] = "Only on a specified date"
+    assert validate_move_form(form, canton) == "Enter the specified notice date or rule."
+    form["specified_notice_date"] = "31/10"
+    form["compensation"] = "CHF 100"
+    assert "per year or per month" in validate_move_form(form, canton)
+
+
+def test_exact_coordinates_drive_canton_and_language_then_generate_documents():
+    at = _complete_form(
+        AppTest.from_function(_form_app, default_timeout=30).run(),
+        latitude=46.04,
+        longitude=8.95,
+    )
+    assert _by_label(
+        at.selectbox, "Official BLV stock-control language"
+    ).value == "Italiano"
+
+    _by_label(at.button, "Prepare documents").click().run()
+
+    assert not at.error
+    assert at.session_state["prepared_documents"]["data"]["destination_canton"] == "TI"
+
+
+def test_editing_a_field_invalidates_prepared_documents():
+    at = _complete_form(AppTest.from_function(_form_app, default_timeout=30).run())
+    _by_label(at.button, "Prepare documents").click().run()
+    assert at.session_state["prepared_documents"]["data"]["parcel"] == "Parcel 123"
+
+    _by_label(at.text_input, "Property / parcel *").set_value("Parcel changed").run()
+
+    assert "prepared_documents" not in at.session_state
+    assert any("Prepare the documents again" in message.value for message in at.info)

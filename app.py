@@ -8,24 +8,27 @@ describe that use in the submitted video and list of aids. See
 
 from __future__ import annotations
 
-import base64
 from pathlib import Path
 from urllib.parse import quote
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 from dotenv import load_dotenv
 from streamlit_searchbox import st_searchbox
 
 from analysis import BeeMoveAnalysis
 from config import Config
 from ml.flowering_model import FloweringModel
-import services.compliance as compliance
 from services.compliance import (
     FSVO_BEES_URL,
+    FSVO_BEES_URLS,
     FSVO_STOCK_CONTROL_GUIDE_URL,
+    FSVO_STOCK_CONTROL_GUIDE_URLS,
     FSVO_STOCK_CONTROL_TEMPLATE_URL,
+    FSVO_STOCK_CONTROL_TEMPLATE_URLS,
     LAND_AGREEMENT_SOURCE_URL,
+    LAND_AGREEMENT_SOURCE_URLS,
     VETERINARY_DIRECTORY_URL,
     movement_steps,
     notification_copy,
@@ -40,6 +43,21 @@ from services.phenology import PhenologyService
 from services.pollen import PollenService
 from services.routing import RoutingService
 from ui.map import map_html
+from ui.move_form import (
+    BLV_FIELD_LABELS,
+    COMPENSATION_PERIOD_OPTIONS,
+    DOCUMENT_LANGUAGE_OPTIONS,
+    DURATION_OPTIONS,
+    INSTALLATION_OPTIONS,
+    MOVEMENT_REASON_DEFAULTS,
+    NOTICE_PERIOD_OPTIONS,
+    NOTICE_TIMING_OPTIONS,
+    SITE_PLAN_OPTIONS,
+    build_document_data,
+    coordinates_in_swiss_bounds,
+    document_language_for_canton,
+    validate_move_form,
+)
 
 load_dotenv()
 st.set_page_config(page_title="Bee the Move", page_icon="🐝", layout="wide")
@@ -52,56 +70,6 @@ ELEVATION_OPTIONS = (
     "600–1,000 m",
     "Above 1,000 m",
 )
-INSTALLATION_OPTIONS = (
-    "Not selected",
-    "Bee house",
-    "Hives without a bee house",
-    "Other",
-)
-SITE_PLAN_OPTIONS = ("Not selected", "Yes", "No")
-DURATION_OPTIONS = ("Not selected", "Fixed term", "Open-ended")
-NOTICE_PERIOD_OPTIONS = ("Not selected", "3 months", "6 months", "9 months", "12 months")
-NOTICE_TIMING_OPTIONS = (
-    "Not selected",
-    "Any time",
-    "At month end",
-    "Only on a specified date",
-)
-COMPENSATION_PERIOD_OPTIONS = ("Not selected", "Year", "Month")
-DOCUMENT_LANGUAGE_OPTIONS = {
-    "Deutsch": "de",
-    "Français": "fr",
-    "Italiano": "it",
-}
-MOVEMENT_REASON_DEFAULTS = {
-    "de": "Verstellen",
-    "fr": "Déplacement",
-    "it": "Trasferimento",
-}
-BLV_FIELD_LABELS = {
-    "de": {
-        "apiary": "Stand-Nr. / Flurname",
-        "street": "Strasse, Nr.",
-        "city": "PLZ / Ort",
-        "origin": "Zugänge von Bienenstand Nummer",
-        "reason": "Ursache / Begründung",
-    },
-    "fr": {
-        "apiary": "N° du rucher / Nom local",
-        "street": "Rue, numéro",
-        "city": "NPA / lieu",
-        "origin": "Entrées dans le rucher numéro",
-        "reason": "Cause / motif",
-    },
-    "it": {
-        "apiary": "N. apiario / Nome locale",
-        "street": "Via / n.",
-        "city": "NPA / località",
-        "origin": "Aumenti numero di apiario",
-        "reason": "Causa / Motivo",
-    },
-}
-
 
 @st.cache_resource
 def build_analysis() -> BeeMoveAnalysis:
@@ -287,8 +255,7 @@ def _results(result: dict) -> dict:
 
     map_column, detail_column = st.columns([1.65, 1])
     with map_column:
-        encoded = base64.b64encode(map_html(result, selected["name"]).encode()).decode()
-        st.iframe(f"data:text/html;base64,{encoded}", height=540)
+        components.html(map_html(result, selected["name"]), height=540)
         st.caption(
             "Map controls switch each evidence layer on or off. Small pale-green dots are centroids of mapped "
             "agricultural parcels near the searched place; they are not flowering observations."
@@ -314,6 +281,12 @@ def _results(result: dict) -> dict:
         ):
             value = selected["components"][key]
             st.progress(int(value), text=f"{title}: {value:.0f}/100")
+        missing_evidence = _missing_evidence(selected, result)
+        if missing_evidence:
+            st.warning(
+                "Partial analysis: " + "; ".join(missing_evidence) + ". "
+                "The available components were still calculated, but compare this result cautiously."
+            )
         st.info(_candidate_summary(selected))
 
     weather = pd.DataFrame(selected["weather"]["days"])
@@ -394,13 +367,18 @@ def _move_preparation(analysis: BeeMoveAnalysis, result: dict, destination: dict
         f"Selected destination: **{destination['name']}**. Complete the guided fields once; "
         "Bee the Move inserts them into copies of the original source documents."
     )
+    st.caption(
+        "Privacy: personal and property details are used only to create documents in the current "
+        "Streamlit session. They are not sent to the public-data APIs and are not written to the repository."
+    )
     origin_canton = _safe_canton(analysis, result["origin"])
-    destination_canton = _safe_canton(analysis, destination)
+    suggested_destination_canton = _safe_canton(analysis, destination)
     origin_code = origin_canton.get("code", "") if origin_canton else ""
-    destination_code = destination_canton.get("code", "") if destination_canton else ""
+    suggested_destination_code = (
+        suggested_destination_canton.get("code", "")
+        if suggested_destination_canton else ""
+    )
     origin_office = veterinary_office(origin_code)
-    office = veterinary_office(destination_code)
-    default_language = _document_language_for_canton(destination_code)
 
     with st.container():
         st.subheader("1 · Beekeeper")
@@ -502,34 +480,6 @@ def _move_preparation(analysis: BeeMoveAnalysis, result: dict, destination: dict
         compensation_period = b.radio("Compensation period", COMPENSATION_PERIOD_OPTIONS, horizontal=True)
 
         st.subheader("3 · Apiary and movement record")
-        language_labels = list(DOCUMENT_LANGUAGE_OPTIONS)
-        document_language_label = st.selectbox(
-            "Official BLV stock-control language",
-            language_labels,
-            index=language_labels.index(default_language),
-            help=(
-                "The BLV publishes separate original templates in German, French and Italian. "
-                "This choice changes only the BLV record; the BienenSchweiz sample agreement remains German."
-            ),
-        )
-        document_language = DOCUMENT_LANGUAGE_OPTIONS[document_language_label]
-        blv_labels = BLV_FIELD_LABELS[document_language]
-        a, b, c = st.columns(3)
-        apiary_number = a.text_input(
-            "Destination apiary number *", placeholder="e.g. SG-456",
-            help=f"Official BLV field: {blv_labels['apiary']}.",
-        )
-        site_street = b.text_input(
-            "Destination street / field address *", placeholder="e.g. parcel 123, Feldweg",
-            help=f"Official BLV field: {blv_labels['street']}.",
-        )
-        site_city = c.text_input(
-            "Destination postcode and town *",
-            value=_postcode_and_town(destination),
-            key=f"site_city_{destination['lat']:.5f}_{destination['lon']:.5f}",
-            placeholder="e.g. 9050 Appenzell",
-            help=f"Official BLV field: {blv_labels['city']}.",
-        )
         st.caption(
             "Recommended-area centre for reference only: "
             f"{destination['lat']:.6f}° N, {destination['lon']:.6f}° E. "
@@ -560,6 +510,64 @@ def _move_preparation(analysis: BeeMoveAnalysis, result: dict, destination: dict
             placeholder="e.g. 9.409000",
             help="WGS84 longitude of the exact apiary or parcel position.",
         )
+        exact_destination_canton = None
+        if exact_latitude is not None and exact_longitude is not None:
+            if coordinates_in_swiss_bounds(exact_latitude, exact_longitude):
+                exact_destination_canton = _safe_canton(
+                    analysis, {"lat": exact_latitude, "lon": exact_longitude}
+                )
+                if exact_destination_canton:
+                    st.caption(
+                        "GeoAdmin verified destination canton: "
+                        f"{exact_destination_canton['code']}."
+                    )
+                else:
+                    st.warning(
+                        "GeoAdmin could not verify these coordinates as a Swiss location. "
+                        "Check them or retry before preparing documents."
+                    )
+            else:
+                st.warning("The entered coordinates are outside the Swiss bounding area.")
+
+        destination_code = (
+            exact_destination_canton.get("code", "")
+            if exact_destination_canton else suggested_destination_code
+        )
+        office = veterinary_office(destination_code)
+
+        language_labels = list(DOCUMENT_LANGUAGE_OPTIONS)
+        document_language_default = document_language_for_canton(destination_code)
+        document_language_label = st.selectbox(
+            "Official BLV stock-control language",
+            language_labels,
+            index=language_labels.index(document_language_default),
+            key=f"document_language_{destination_code or 'unverified'}",
+            help=(
+                "The BLV publishes separate original templates in German, French and Italian. "
+                "The default follows the verified destination canton; another official language "
+                "can still be selected. The BienenSchweiz sample agreement remains German."
+            ),
+        )
+        document_language = DOCUMENT_LANGUAGE_OPTIONS[document_language_label]
+        blv_labels = BLV_FIELD_LABELS[document_language]
+        a, b, c = st.columns(3)
+        apiary_number = a.text_input(
+            "Destination apiary number *", placeholder="e.g. SG-456",
+            key="destination_apiary_number",
+            help=f"Official BLV field: {blv_labels['apiary']}.",
+        )
+        site_street = b.text_input(
+            "Destination street / field address *", placeholder="e.g. parcel 123, Feldweg",
+            key="destination_site_street",
+            help=f"Official BLV field: {blv_labels['street']}.",
+        )
+        site_city = c.text_input(
+            "Destination postcode and town *",
+            value=_postcode_and_town(destination),
+            key=f"site_city_{destination['lat']:.5f}_{destination['lon']:.5f}",
+            placeholder="e.g. 9050 Appenzell",
+            help=f"Official BLV field: {blv_labels['city']}.",
+        )
         a, b, c = st.columns(3)
         move_date = a.date_input(
             "Planned move date *", value=None, format="DD/MM/YYYY"
@@ -567,6 +575,7 @@ def _move_preparation(analysis: BeeMoveAnalysis, result: dict, destination: dict
         colonies = b.number_input("Colonies moved *", min_value=1, value=1, step=1)
         origin_apiary_number = c.text_input(
             "Origin apiary number *", placeholder="e.g. SG-111",
+            key="origin_apiary_number",
             help=f"Official BLV movement field: {blv_labels['origin']}.",
         )
         a, b = st.columns(2)
@@ -592,69 +601,72 @@ def _move_preparation(analysis: BeeMoveAnalysis, result: dict, destination: dict
         st.caption("Documents are prepared only after this confirmation is selected.")
         submitted = st.button("Prepare documents", type="primary", width="stretch")
 
+    form_state = {
+        "destination_key": (
+            destination["name"], destination["lat"], destination["lon"]
+        ),
+        "document_language": document_language,
+        "beekeeper": beekeeper,
+        "beekeeper_number": beekeeper_number,
+        "section": section,
+        "beekeeper_street": beekeeper_street,
+        "beekeeper_city": beekeeper_city,
+        "phone": phone,
+        "email": email,
+        "landowner": landowner,
+        "parcel": parcel,
+        "area_m2": area_m2,
+        "installation": installation,
+        "other_installation": other_installation,
+        "site_plan": site_plan,
+        "start_date": start_date,
+        "duration": duration,
+        "end_date": end_date,
+        "notice_period": notice_period,
+        "notice_timing": notice_timing,
+        "specified_notice_date": specified_notice_date,
+        "other_notice_rule": other_notice_rule,
+        "additional_duty": additional_duty,
+        "compensation": compensation,
+        "compensation_period": compensation_period,
+        "apiary_number": apiary_number,
+        "site_street": site_street,
+        "site_city": site_city,
+        "exact_latitude": exact_latitude,
+        "exact_longitude": exact_longitude,
+        "move_date": move_date,
+        "colonies": colonies,
+        "origin_apiary_number": origin_apiary_number,
+        "movement_reason": movement_reason,
+        "inspector": inspector,
+        "confirmation": confirmation,
+    }
+
     if submitted:
-        required_text = (
-            beekeeper,
-            beekeeper_street,
-            beekeeper_city,
-            landowner,
-            parcel,
-            apiary_number,
-            site_street,
-            site_city,
-            origin_apiary_number,
-            movement_reason,
-        )
-        if not all(str(value).strip() for value in required_text):
-            st.error("Complete every text field marked with *.")
-        elif area_m2 <= 0:
-            st.error("Enter the land area stated in the site agreement.")
-        elif installation == "Not selected" or site_plan == "Not selected":
-            st.error("Choose the installation type and whether a site plan will be attached.")
-        elif duration == "Not selected":
-            st.error("Choose a fixed-term or open-ended agreement.")
-        elif exact_latitude is None or exact_longitude is None:
-            st.error("Enter the exact latitude and longitude of the destination apiary.")
-        elif start_date is None or move_date is None:
-            st.error("Choose the agreement start date and planned move date.")
-        elif duration == "Fixed term" and end_date is None:
-            st.error("Choose an end date or select an open-ended agreement.")
-        elif not confirmation:
-            st.error("Confirm that official checks, notification and signatures are still required.")
+        validation_error = validate_move_form(form_state, exact_destination_canton)
+        if validation_error:
+            st.error(validation_error)
         else:
-            data = {
-                "beekeeper": beekeeper, "beekeeper_number": beekeeper_number,
-                "beekeeper_street": beekeeper_street, "beekeeper_city": beekeeper_city,
-                "phone": phone, "email": email, "section": section,
-                "landowner": landowner, "parcel": parcel, "area_m2": area_m2,
-                "installation": installation, "other_installation": other_installation,
-                "site_plan_attached": site_plan == "Yes", "start_date": start_date,
-                "fixed_term": duration == "Fixed term", "end_date": end_date,
-                "notice_period": notice_period, "notice_timing": notice_timing,
-                "specified_notice_date": specified_notice_date,
-                "other_notice_rule": other_notice_rule, "additional_duty": additional_duty,
-                "compensation": compensation, "compensation_period": compensation_period,
-                "apiary_number": apiary_number, "site_street": site_street,
-                "site_city": site_city, "move_date": move_date, "colonies": colonies,
-                "origin_apiary_number": origin_apiary_number, "bee_inspector": inspector,
-                "movement_reason": movement_reason,
-                "veterinary_office": office["office"],
-                "coordinates": (
-                    f"{exact_latitude:.6f}° N, {exact_longitude:.6f}° E"
-                ),
-                "year": move_date.year,
-                "origin_name": result["origin"]["name"],
-                "destination_name": destination["name"],
-                "origin_canton": origin_code, "destination_canton": destination_code,
-            }
+            data = build_document_data(
+                form_state,
+                origin_name=result["origin"]["name"],
+                origin_canton=origin_code,
+                destination_canton=destination_code,
+                veterinary_office_name=office["office"],
+            )
             st.session_state["prepared_documents"] = {
                 "destination": destination["name"], "language": document_language,
+                "form_state": form_state,
                 "data": data,
                 "agreement": fill_land_agreement(data),
                 "stock_control": fill_stock_control(data, document_language),
             }
 
     prepared = st.session_state.get("prepared_documents")
+    if prepared and prepared.get("form_state") != form_state:
+        st.session_state.pop("prepared_documents", None)
+        prepared = None
+        st.info("The form changed. Prepare the documents again to update the downloads.")
     if (
         prepared
         and prepared.get("destination") == destination["name"]
@@ -671,16 +683,21 @@ def _move_preparation(analysis: BeeMoveAnalysis, result: dict, destination: dict
             file_name="blv-stock-control-filled.docx",
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", width="stretch",
         )
-        _health_notification(prepared["data"], origin_office, office)
+        prepared_office = veterinary_office(prepared["data"]["destination_canton"])
+        _health_notification(prepared["data"], origin_office, prepared_office)
 
     with st.expander("Official checks before moving"):
-        st.caption(f"Detected cantons: {origin_code or 'not available'} → {destination_code or 'not available'}")
+        st.caption(
+            f"Detected cantons: {origin_code or 'not available'} → "
+            f"{destination_code or 'not available'}"
+        )
+        if exact_destination_canton is None:
+            st.caption(
+                "Destination guidance is provisional until the exact coordinates are verified by GeoAdmin."
+            )
         for index, step in enumerate(movement_steps(origin_code, destination_code)):
             st.checkbox(step, key=f"move-step-{index}-{origin_code}-{destination_code}")
-        contact_rows = [origin_office]
-        if (office["canton"], office["email"]) != (origin_office["canton"], origin_office["email"]):
-            contact_rows.append(office)
-        for item in contact_rows:
+        for item in _distinct_offices(origin_office, office):
             st.markdown(f"**{item['canton']} · {item['office']}**")
             if item["email"]:
                 st.caption(f"Contact: {item['email']}")
@@ -694,24 +711,16 @@ def _move_preparation(analysis: BeeMoveAnalysis, result: dict, destination: dict
             "Cantonal pages were checked on 28/09/2026. Temporary restriction zones and contacts can change, "
             "so the official page remains the deciding source."
         )
-        bee_rules_url = _language_link(
-            "FSVO_BEES_URLS", document_language, FSVO_BEES_URL
+        bee_rules_url = FSVO_BEES_URLS.get(document_language, FSVO_BEES_URL)
+        stock_template_url = FSVO_STOCK_CONTROL_TEMPLATE_URLS.get(
+            document_language, FSVO_STOCK_CONTROL_TEMPLATE_URL
         )
-        stock_template_url = _language_link(
-            "FSVO_STOCK_CONTROL_TEMPLATE_URLS",
-            document_language,
-            FSVO_STOCK_CONTROL_TEMPLATE_URL,
-        )
-        stock_guide_url = _language_link(
-            "FSVO_STOCK_CONTROL_GUIDE_URLS",
-            document_language,
-            FSVO_STOCK_CONTROL_GUIDE_URL,
+        stock_guide_url = FSVO_STOCK_CONTROL_GUIDE_URLS.get(
+            document_language, FSVO_STOCK_CONTROL_GUIDE_URL
         )
         agreement_language = "fr" if document_language == "fr" else "de"
-        agreement_url = _language_link(
-            "LAND_AGREEMENT_SOURCE_URLS",
-            agreement_language,
-            LAND_AGREEMENT_SOURCE_URL,
+        agreement_url = LAND_AGREEMENT_SOURCE_URLS.get(
+            agreement_language, LAND_AGREEMENT_SOURCE_URL
         )
         links = st.columns(3)
         links[0].link_button(
@@ -750,13 +759,8 @@ def _health_notification(data: dict, origin_office: dict, destination_office: di
     st.write(
         "Switzerland has no single nationwide clearance form for every move. The app prepares an email draft so the competent authority can confirm the current procedure. It is not an official submission or permit."
     )
-    offices = [origin_office]
-    if (destination_office["canton"], destination_office["email"]) != (
-        origin_office["canton"], origin_office["email"]
-    ):
-        offices.append(destination_office)
     valid = False
-    for item in offices:
+    for item in _distinct_offices(origin_office, destination_office):
         subject, body = notification_copy(data, item["canton"])
         st.text_area(
             f"Draft request for {item['canton']} — review before sending",
@@ -804,9 +808,7 @@ def _method_and_sources(analysis: BeeMoveAnalysis) -> None:
             (
                 "Société romande d’apiculture",
                 "Official French blank sample agreement",
-                _language_link(
-                    "LAND_AGREEMENT_SOURCE_URLS", "fr", LAND_AGREEMENT_SOURCE_URL
-                ),
+                LAND_AGREEMENT_SOURCE_URLS.get("fr", LAND_AGREEMENT_SOURCE_URL),
             ),
             ("openrouteservice / HeiGIT", "Optional road distance", "https://giscience.github.io/openrouteservice/api-reference/endpoints/directions/"),
         ]
@@ -842,16 +844,6 @@ def _postcode_and_town(place: dict) -> str:
     return name
 
 
-def _document_language_for_canton(canton_code: str | None) -> str:
-    """Choose a practical default; the user can always select another language."""
-    code = (canton_code or "").upper()
-    if code == "TI":
-        return "Italiano"
-    if code in {"FR", "GE", "JU", "NE", "VD", "VS"}:
-        return "Français"
-    return "Deutsch"
-
-
 def _candidate_summary(candidate: dict) -> str:
     period = candidate.get("best_period")
     dates = (
@@ -874,6 +866,37 @@ def _candidate_summary(candidate: dict) -> str:
     return f"Best relative period within the next seven days: {dates}. {distance}.{low_signal}"
 
 
+def _missing_evidence(candidate: dict, result: dict) -> list[str]:
+    """Explain partial inputs instead of silently presenting zero-value fallbacks."""
+    missing = []
+    if not candidate.get("flowering", {}).get("available"):
+        missing.append("flowering evidence was unavailable")
+    if not candidate.get("landscape", {}).get("available"):
+        missing.append("agricultural land-use evidence was unavailable")
+    if candidate.get("height_m") is None:
+        missing.append("terrain height was unavailable")
+    routing = result.get("sources", {}).get("openrouteservice", {})
+    if (
+        routing.get("configured")
+        and not candidate.get("is_origin_area")
+        and not candidate.get("route")
+    ):
+        missing.append("the road route failed, so direct distance was retained")
+    return missing
+
+
+def _distinct_offices(*offices: dict) -> list[dict]:
+    """Keep one contact per canton and address while preserving display order."""
+    result = []
+    seen = set()
+    for office in offices:
+        key = office["canton"], office["email"]
+        if key not in seen:
+            seen.add(key)
+            result.append(office)
+    return result
+
+
 def _format_display_date(value) -> str:
     """Display source dates consistently as day/month/year."""
     if value in (None, ""):
@@ -892,12 +915,6 @@ def _source_timestamp(value) -> str:
         return pd.to_datetime(value, utc=True).strftime("%d/%m/%Y %H:%M UTC")
     except (TypeError, ValueError):
         return str(value)
-
-
-def _language_link(mapping_name: str, language: str, fallback: str) -> str:
-    """Read optional language maps without fragile cross-module imports."""
-    mapping = getattr(compliance, mapping_name, {})
-    return mapping.get(language, fallback)
 
 
 if __name__ == "__main__":

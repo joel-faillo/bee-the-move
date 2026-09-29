@@ -49,7 +49,8 @@ Without a key, the app clearly uses direct Haversine distance.
    readable.
 5. Select a destination and enter the beekeeper, land, contract and movement
    details in the same page. The recommended-area centre is only a reference:
-   enter the exact apiary or parcel coordinates for the official form.
+   enter the exact apiary or parcel coordinates for the official form. GeoAdmin
+   verifies that point and determines the competent destination canton.
 6. Enter dates in Swiss day/month/year order. Results, charts and source
    timestamps use the same order. Open-ended agreements do not request or
    insert a fixed-term end date.
@@ -64,6 +65,14 @@ Without a key, the app clearly uses direct Haversine distance.
 Signatures remain blank. The user must review the generated files, contact the
 competent bee inspectors, check current restriction zones, and complete any
 canton-specific procedure.
+
+Changing any form field invalidates the previous downloads, preventing an old
+document from being mistaken for the revised version. The app also checks date
+order and dependent contract fields before generation.
+
+Personal and property details remain in the current Streamlit session for
+document generation. They are not written to the repository or sent to the
+public-data APIs used for the recommendation.
 
 ## BeeScore
 
@@ -80,6 +89,9 @@ points. Agricultural forage coefficients and normalisation thresholds are
 transparent prototype assumptions, not official agronomic thresholds. The
 pale-green map dots are agricultural-parcel centroids, not bees, pollen counts
 or flowering observations.
+
+If an optional scoring source fails, the interface marks the analysis as
+partial instead of silently presenting its zero-value fallback as complete.
 
 ## Flowering model
 
@@ -166,6 +178,7 @@ services/landscape.py          mapped agricultural forage
 services/compliance.py         canton routing and notification text
 services/official_documents.py official PDF/DOCX filling
 ui/map.py                      MapLibre and swisstopo map
+ui/move_form.py                movement-form options, validation and data mapping
 static/forms/                  unmodified official source templates
 tests/                         scoring, sources, documents and compliance
 ```
