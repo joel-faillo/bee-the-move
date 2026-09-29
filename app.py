@@ -23,7 +23,7 @@ from ml.flowering_model import FloweringModel
 from services.compliance import (
     FSVO_BEES_URL,
     FSVO_STOCK_CONTROL_GUIDE_URL,
-    FSVO_STOCK_CONTROL_TEMPLATE_URLS,
+    FSVO_STOCK_CONTROL_TEMPLATE_URL,
     LAND_AGREEMENT_SOURCE_URL,
     VETERINARY_DIRECTORY_URL,
     movement_steps,
@@ -572,8 +572,8 @@ def _move_preparation(analysis: BeeMoveAnalysis, result: dict, destination: dict
         links[0].link_button("BLV bee rules", FSVO_BEES_URL, width="stretch")
         links[1].link_button("Cantonal directory", VETERINARY_DIRECTORY_URL, width="stretch")
         links[2].link_button(
-            f"Blank BLV form ({document_language.upper()})",
-            FSVO_STOCK_CONTROL_TEMPLATE_URLS[document_language],
+            "Blank BLV form (DE)",
+            FSVO_STOCK_CONTROL_TEMPLATE_URL,
             width="stretch",
         )
         links[3].link_button("BLV instructions", FSVO_STOCK_CONTROL_GUIDE_URL, width="stretch")
