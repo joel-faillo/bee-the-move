@@ -20,20 +20,7 @@ from streamlit_searchbox import st_searchbox
 from analysis import BeeMoveAnalysis
 from config import Config
 from ml.flowering_model import FloweringModel
-from services.compliance import (
-    FSVO_BEES_URL,
-    FSVO_BEES_URLS,
-    FSVO_STOCK_CONTROL_GUIDE_URL,
-    FSVO_STOCK_CONTROL_GUIDE_URLS,
-    FSVO_STOCK_CONTROL_TEMPLATE_URL,
-    FSVO_STOCK_CONTROL_TEMPLATE_URLS,
-    LAND_AGREEMENT_SOURCE_URL,
-    LAND_AGREEMENT_SOURCE_URLS,
-    VETERINARY_DIRECTORY_URL,
-    movement_steps,
-    notification_copy,
-    veterinary_office,
-)
+import services.compliance as compliance
 from services.geo import GeoAdminService
 from services.http import HttpClient
 from services.landscape import FORAGE_CATEGORIES, LandscapeService
@@ -378,7 +365,7 @@ def _move_preparation(analysis: BeeMoveAnalysis, result: dict, destination: dict
         suggested_destination_canton.get("code", "")
         if suggested_destination_canton else ""
     )
-    origin_office = veterinary_office(origin_code)
+    origin_office = compliance.veterinary_office(origin_code)
 
     with st.container():
         st.subheader("1 · Beekeeper")
@@ -533,7 +520,7 @@ def _move_preparation(analysis: BeeMoveAnalysis, result: dict, destination: dict
             exact_destination_canton.get("code", "")
             if exact_destination_canton else suggested_destination_code
         )
-        office = veterinary_office(destination_code)
+        office = compliance.veterinary_office(destination_code)
 
         language_labels = list(DOCUMENT_LANGUAGE_OPTIONS)
         document_language_default = document_language_for_canton(destination_code)
@@ -683,7 +670,9 @@ def _move_preparation(analysis: BeeMoveAnalysis, result: dict, destination: dict
             file_name="blv-stock-control-filled.docx",
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", width="stretch",
         )
-        prepared_office = veterinary_office(prepared["data"]["destination_canton"])
+        prepared_office = compliance.veterinary_office(
+            prepared["data"]["destination_canton"]
+        )
         _health_notification(prepared["data"], origin_office, prepared_office)
 
     with st.expander("Official checks before moving"):
@@ -695,7 +684,9 @@ def _move_preparation(analysis: BeeMoveAnalysis, result: dict, destination: dict
             st.caption(
                 "Destination guidance is provisional until the exact coordinates are verified by GeoAdmin."
             )
-        for index, step in enumerate(movement_steps(origin_code, destination_code)):
+        for index, step in enumerate(
+            compliance.movement_steps(origin_code, destination_code)
+        ):
             st.checkbox(step, key=f"move-step-{index}-{origin_code}-{destination_code}")
         for item in _distinct_offices(origin_office, office):
             st.markdown(f"**{item['canton']} · {item['office']}**")
@@ -711,16 +702,18 @@ def _move_preparation(analysis: BeeMoveAnalysis, result: dict, destination: dict
             "Cantonal pages were checked on 28/09/2026. Temporary restriction zones and contacts can change, "
             "so the official page remains the deciding source."
         )
-        bee_rules_url = FSVO_BEES_URLS.get(document_language, FSVO_BEES_URL)
-        stock_template_url = FSVO_STOCK_CONTROL_TEMPLATE_URLS.get(
-            document_language, FSVO_STOCK_CONTROL_TEMPLATE_URL
+        bee_rules_url = compliance.FSVO_BEES_URLS.get(
+            document_language, compliance.FSVO_BEES_URL
         )
-        stock_guide_url = FSVO_STOCK_CONTROL_GUIDE_URLS.get(
-            document_language, FSVO_STOCK_CONTROL_GUIDE_URL
+        stock_template_url = compliance.FSVO_STOCK_CONTROL_TEMPLATE_URLS.get(
+            document_language, compliance.FSVO_STOCK_CONTROL_TEMPLATE_URL
+        )
+        stock_guide_url = compliance.FSVO_STOCK_CONTROL_GUIDE_URLS.get(
+            document_language, compliance.FSVO_STOCK_CONTROL_GUIDE_URL
         )
         agreement_language = "fr" if document_language == "fr" else "de"
-        agreement_url = LAND_AGREEMENT_SOURCE_URLS.get(
-            agreement_language, LAND_AGREEMENT_SOURCE_URL
+        agreement_url = compliance.LAND_AGREEMENT_SOURCE_URLS.get(
+            agreement_language, compliance.LAND_AGREEMENT_SOURCE_URL
         )
         links = st.columns(3)
         links[0].link_button(
@@ -728,7 +721,11 @@ def _move_preparation(analysis: BeeMoveAnalysis, result: dict, destination: dict
             bee_rules_url,
             width="stretch",
         )
-        links[1].link_button("Cantonal directory", VETERINARY_DIRECTORY_URL, width="stretch")
+        links[1].link_button(
+            "Cantonal directory",
+            compliance.VETERINARY_DIRECTORY_URL,
+            width="stretch",
+        )
         links[2].link_button(
             f"Blank BLV form ({document_language.upper()})",
             stock_template_url,
@@ -761,7 +758,7 @@ def _health_notification(data: dict, origin_office: dict, destination_office: di
     )
     valid = False
     for item in _distinct_offices(origin_office, destination_office):
-        subject, body = notification_copy(data, item["canton"])
+        subject, body = compliance.notification_copy(data, item["canton"])
         st.text_area(
             f"Draft request for {item['canton']} — review before sending",
             body, height=300, key=f"health-message-{item['canton']}",
@@ -803,12 +800,22 @@ def _method_and_sources(analysis: BeeMoveAnalysis) -> None:
             ("MeteoSwiss Pollen", "Regional context only", "https://opendatadocs.meteoswiss.ch/a-data-groundbased/a7-pollen-stations"),
             ("Agricultural land use", "Annual parcels used by the app's forage heuristic", "https://opendata.swiss/en/dataset/landwirtschaftliche-nutzungsflachen-schweiz"),
             ("swisstopo Vector Tiles", "Official map", "https://docs.geo.admin.ch/visualize-data/vector-tiles.html"),
-            ("BLV", "Federal stock-control form and movement guidance", FSVO_BEES_URL),
-            ("BienenSchweiz", "German association sample agreement used for prefilling", LAND_AGREEMENT_SOURCE_URL),
+            (
+                "BLV",
+                "Federal stock-control form and movement guidance",
+                compliance.FSVO_BEES_URL,
+            ),
+            (
+                "BienenSchweiz",
+                "German association sample agreement used for prefilling",
+                compliance.LAND_AGREEMENT_SOURCE_URL,
+            ),
             (
                 "Société romande d’apiculture",
                 "Official French blank sample agreement",
-                LAND_AGREEMENT_SOURCE_URLS.get("fr", LAND_AGREEMENT_SOURCE_URL),
+                compliance.LAND_AGREEMENT_SOURCE_URLS.get(
+                    "fr", compliance.LAND_AGREEMENT_SOURCE_URL
+                ),
             ),
             ("openrouteservice / HeiGIT", "Optional road distance", "https://giscience.github.io/openrouteservice/api-reference/endpoints/directions/"),
         ]
