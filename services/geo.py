@@ -14,7 +14,7 @@ from services.http import HttpClient
 
 SEARCH_URL = "https://api3.geo.admin.ch/rest/services/ech/SearchServer"
 HEIGHT_URL = "https://api3.geo.admin.ch/rest/services/height"
-IDENTIFY_URL = "https://api3.geo.admin.ch/rest/services/api/MapServer/identify"
+IDENTIFY_URL = "https://api3.geo.admin.ch/rest/services/ech/MapServer/identify"
 CANTON_LAYER = "ch.swisstopo.swissboundaries3d-kanton-flaeche.fill"
 PLACE_ORIGINS = {"zipcode", "gg25", "district", "kantone"}
 

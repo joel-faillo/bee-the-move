@@ -1,4 +1,4 @@
-from services.routing import ORS_URL, RoutingService
+from services.routing import ORS_URL, SNAP_RADIUS_METRES, RoutingService
 
 
 class StubHttp:
@@ -23,7 +23,10 @@ def test_routing_uses_current_heigit_endpoint_and_converts_units():
     assert ORS_URL.startswith("https://api.heigit.org/openrouteservice/")
     assert http.request == (
         ORS_URL,
-        {"coordinates": [[9.37, 47.42], [9.41, 47.33]]},
+        {
+            "coordinates": [[9.37, 47.42], [9.41, 47.33]],
+            "radiuses": [SNAP_RADIUS_METRES, SNAP_RADIUS_METRES],
+        },
         {"Authorization": "secret-key"},
     )
     assert route == {"distance_km": 12.3, "duration_minutes": 25}

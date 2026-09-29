@@ -1,4 +1,5 @@
 from ui.map import map_html
+from services.landscape import FORAGE_CATEGORIES
 
 
 def test_map_explains_and_controls_context_layers():
@@ -8,11 +9,12 @@ def test_map_explains_and_controls_context_layers():
         "results": [],
         "forage_map": [
             {
-                "name": "Extensive meadow",
-                "category": "Meadows",
-                "lat": 47.43,
-                "lon": 9.38,
+                "name": category,
+                "category": category,
+                "lat": 47.43 + index / 10_000,
+                "lon": 9.38 + index / 10_000,
             }
+            for index, category in enumerate(FORAGE_CATEGORIES)
         ],
         "phenology_station": {
             "name": "St. Gallen",
@@ -32,9 +34,36 @@ def test_map_explains_and_controls_context_layers():
     html = map_html(result)
 
     assert "Phenology station" in html
-    assert "Agricultural forage points" in html
-    assert "Pollen station" in html
+    assert "Agricultural parcels near searched place" in html
+    assert "Pollen station near searched place" in html
+    assert "maplibre-gl@5.24.0" in html
     assert "All forage categories" in html
-    assert "Meadows" in html
+    for category in FORAGE_CATEGORIES:
+        assert category in html
+    for layer in ("radius-line,radius-fill", "candidates", "phenology", "pollen", "forage"):
+        assert f'data-layer="{layer}"' in html
     assert 'class="layer-options" hidden' in html
     assert 'aria-expanded="false"' in html
+
+
+def test_origin_is_not_duplicated_as_a_candidate_marker():
+    result = {
+        "origin": {"name": "St. Gallen", "lat": 47.424, "lon": 9.376},
+        "radius_km": 20,
+        "results": [
+            {
+                "name": "St. Gallen",
+                "lat": 47.424,
+                "lon": 9.376,
+                "score": 50,
+                "is_origin_area": True,
+            }
+        ],
+        "forage_map": [],
+        "phenology_station": None,
+        "pollen": {"available": False},
+    }
+
+    html = map_html(result, "St. Gallen")
+
+    assert '"candidates": {"type": "FeatureCollection", "features": []}' in html

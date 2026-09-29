@@ -96,10 +96,14 @@ def map_html(result: dict, selected_name: str | None = None) -> str:
             "pollen": {"type": "FeatureCollection", "features": pollen_features},
         }
     )
+    # Keep the latest v5 UMD build here. MapLibre v6 is ESM-only and its worker
+    # cannot start inside Streamlit's iframe without self-hosted worker modules
+    # or a custom frontend component, neither of which is justified for this map.
     return f"""
 <!doctype html><html><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<link href="https://unpkg.com/maplibre-gl@5.7.1/dist/maplibre-gl.css" rel="stylesheet">
+<link href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" rel="stylesheet">
+<script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
 <style>
 html,body,#map{{height:100%;margin:0}}
 .maplibregl-popup-content{{font:14px system-ui;padding:9px 12px}}
@@ -110,7 +114,6 @@ html,body,#map{{height:100%;margin:0}}
 .layers select{{width:100%;margin-top:5px;padding:4px;border:1px solid #cbd5ce;border-radius:4px}}
 </style>
 </head><body><div id="map"></div>
-<script src="https://unpkg.com/maplibre-gl@5.7.1/dist/maplibre-gl.js"></script>
 <script>
 const data={payload};
 const map=new maplibregl.Map({{container:'map',style:'{STYLE_URL}',center:[{origin['lon']},{origin['lat']}],zoom:8}});
@@ -124,8 +127,8 @@ class LayerControl {{
         <label><input type="checkbox" data-layer="candidates" checked> Recommended areas</label>
         <label><input type="checkbox" data-layer="radius-line,radius-fill" checked> Search radius</label>
         <label><input type="checkbox" data-layer="phenology" checked> Phenology station</label>
-        <label><input type="checkbox" data-layer="forage"> Agricultural forage points</label>
-        <label><input type="checkbox" data-layer="pollen"> Pollen station</label>
+        <label><input type="checkbox" data-layer="forage"> Agricultural parcels near searched place</label>
+        <label><input type="checkbox" data-layer="pollen"> Pollen station near searched place</label>
         <select id="forage-category"><option value="">All forage categories</option></select>
       </div>`;
     const toggle=this.container.querySelector('.layer-toggle');

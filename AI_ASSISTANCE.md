@@ -3,7 +3,7 @@
 ## Tool and purpose
 
 The team used **OpenAI Codex** as a programming aid between 21 and
-28 September 2026. Codex helped restructure an earlier Flask prototype as a
+29 September 2026. Codex helped restructure an earlier Flask prototype as a
 Streamlit application, draft and review Python code, prepare tests, improve
 documentation, and audit the interface and the official-source workflow.
 
@@ -50,7 +50,7 @@ The team remains responsible for:
 For an accompanying report or methods section, describe the use in prose and
 cite it as **(OpenAI, 2026)** where AI-assisted content is reproduced.
 
-> OpenAI. (2026). *Codex* (accessed 28 September 2026) [Large language model].
+> OpenAI. (2026). *Codex* (accessed 29 September 2026) [Large language model].
 > https://openai.com/codex/
 
 This record follows the course slides and the HSG “Writing with AI” guidance:

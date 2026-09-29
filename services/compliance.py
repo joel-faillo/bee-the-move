@@ -12,11 +12,9 @@ official links below and remains responsible for the submitted code.
 
 from __future__ import annotations
 
-VETERINARY_DIRECTORY_URL = (
-    "https://www.blv.admin.ch/dam/blv/de/dokumente/import-export/import/"
-    "adressliste-kantonalen-veterinaeraemter-db.pdf.download.pdf/"
-    "Adressliste%20der%20kantonalen%20Veterinaeraemter.pdf"
-)
+# The BLV now links to the maintained directory of the Association of Swiss
+# Cantonal Veterinarians instead of the former static BLV PDF.
+VETERINARY_DIRECTORY_URL = "https://www.kantonstieraerzte.ch/uber-uns.html"
 FSVO_BEES_URL = "https://www.blv.admin.ch/de/bienen"
 FSVO_STOCK_CONTROL_TEMPLATE_URL = (
     "https://www.blv.admin.ch/dam/de/sd-web/keeNTCMwOYVC/"

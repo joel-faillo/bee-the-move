@@ -21,6 +21,7 @@ from pypdf import PdfReader, PdfWriter
 FORMS_DIRECTORY = Path(__file__).resolve().parents[1] / "static" / "forms"
 LAND_AGREEMENT_TEMPLATE = FORMS_DIRECTORY / "bienenschweiz-land-agreement.pdf"
 STOCK_CONTROL_TEMPLATE = FORMS_DIRECTORY / "blv-stock-control.docx"
+AUTHORSHIP_DECLARATION = FORMS_DIRECTORY / "hsg-declaration-of-authorship.pdf"
 
 
 def fill_land_agreement(data: dict) -> bytes:

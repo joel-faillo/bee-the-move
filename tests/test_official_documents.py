@@ -1,11 +1,17 @@
 from datetime import date
+import hashlib
 from io import BytesIO
 
+import pytest
 from docx import Document
 from pypdf import PdfReader
 
 from services.official_documents import fill_land_agreement, fill_stock_control
-from services.official_documents import LAND_AGREEMENT_TEMPLATE, STOCK_CONTROL_TEMPLATE
+from services.official_documents import (
+    AUTHORSHIP_DECLARATION,
+    LAND_AGREEMENT_TEMPLATE,
+    STOCK_CONTROL_TEMPLATE,
+)
 
 
 def _data():
@@ -88,3 +94,118 @@ def test_generators_never_modify_the_bundled_official_templates():
 
     assert LAND_AGREEMENT_TEMPLATE.read_bytes() == pdf_before
     assert STOCK_CONTROL_TEMPLATE.read_bytes() == docx_before
+
+
+@pytest.mark.parametrize(
+    ("choice", "field", "value"),
+    [
+        ("Bee house", "ein Bienenhaus gestellt Fahrnisbaute Pläne oder Fotos liegen bei", "/On"),
+        ("Hives without a bee house", "kein Bienenhaus gestellt Pläne oder Fotos von Bienenbeute liegen bei", "/On"),
+        ("Other", "Check Box1", "/Ja"),
+    ],
+)
+def test_every_installation_option_maps_to_the_original_pdf(choice, field, value):
+    data = _data()
+    data["installation"] = choice
+    fields = PdfReader(BytesIO(fill_land_agreement(data))).get_fields()
+    assert fields[field]["/V"] == value
+
+
+@pytest.mark.parametrize(("attached", "field"), [(True, "Ja empfohlen"), (False, "Nein")])
+def test_both_site_plan_options_map_to_the_original_pdf(attached, field):
+    data = _data()
+    data["site_plan_attached"] = attached
+    fields = PdfReader(BytesIO(fill_land_agreement(data))).get_fields()
+    assert fields[field]["/V"] == "/On"
+
+
+@pytest.mark.parametrize(
+    ("fixed", "field"), [(True, "befristet bis"), (False, "unbefristet")]
+)
+def test_both_duration_options_map_to_the_original_pdf(fixed, field):
+    data = _data()
+    data["fixed_term"] = fixed
+    fields = PdfReader(BytesIO(fill_land_agreement(data))).get_fields()
+    assert fields[field]["/V"] == "/On"
+
+
+@pytest.mark.parametrize(
+    ("choice", "field"),
+    [
+        ("3 months", "3 Monate"),
+        ("6 months", "6 Monate"),
+        ("9 months", "9 Monate"),
+        ("12 months", "12 Monate"),
+    ],
+)
+def test_every_notice_period_maps_to_the_original_pdf(choice, field):
+    data = _data()
+    data["notice_period"] = choice
+    fields = PdfReader(BytesIO(fill_land_agreement(data))).get_fields()
+    assert fields[field]["/V"] == "/On"
+
+
+@pytest.mark.parametrize(
+    ("choice", "field"),
+    [
+        ("Any time", "beliebig"),
+        ("At month end", "auf ein Monatsende"),
+        ("Only on a specified date", "nur per"),
+    ],
+)
+def test_every_notice_timing_maps_to_the_original_pdf(choice, field):
+    data = _data()
+    data["notice_timing"] = choice
+    fields = PdfReader(BytesIO(fill_land_agreement(data))).get_fields()
+    assert fields[field]["/V"] == "/On"
+
+
+@pytest.mark.parametrize(("choice", "field"), [("Year", "Jahr"), ("Month", "Monat")])
+def test_both_compensation_periods_map_to_the_original_pdf(choice, field):
+    data = _data()
+    data["compensation_period"] = choice
+    fields = PdfReader(BytesIO(fill_land_agreement(data))).get_fields()
+    assert fields[field]["/V"] == "/On"
+
+
+def test_not_selected_contract_options_leave_every_corresponding_box_open():
+    data = _data()
+    data.update(
+        {
+            "notice_period": "Not selected",
+            "notice_timing": "Not selected",
+            "other_notice_rule": "",
+            "compensation_period": "Not selected",
+        }
+    )
+    fields = PdfReader(BytesIO(fill_land_agreement(data))).get_fields()
+    untouched = (
+        "3 Monate",
+        "6 Monate",
+        "9 Monate",
+        "12 Monate",
+        "beliebig",
+        "auf ein Monatsende",
+        "nur per",
+        "Check Box2",
+        "Jahr",
+        "Monat",
+    )
+    assert all(fields[name].get("/V") is None for name in untouched)
+
+
+def test_filled_pdf_keeps_logical_values_and_widget_appearances():
+    reader = PdfReader(BytesIO(fill_land_agreement(_data())))
+    for annotation in reader.pages[0].get("/Annots") or []:
+        widget = annotation.get_object()
+        if widget.get("/Subtype") != "/Widget" or widget.get("/V") is None:
+            continue
+        assert widget.get("/AP", {}).get("/N")
+
+
+def test_hsg_declaration_is_the_unchanged_supplied_official_pdf():
+    assert AUTHORSHIP_DECLARATION.exists()
+    assert len(PdfReader(AUTHORSHIP_DECLARATION).pages) == 1
+    assert hashlib.sha256(AUTHORSHIP_DECLARATION.read_bytes()).hexdigest() == (
+        "a257cb09939dd0dbf52625bb2559c137dca740e01b839d130a3869c9213195ff"
+    )

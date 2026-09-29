@@ -1,3 +1,7 @@
+from dataclasses import replace
+
+import pytest
+
 from services.meteoswiss import ForecastPoint
 
 from analysis import BeeMoveAnalysis, _matches_elevation
@@ -123,3 +127,100 @@ def test_elevation_filter_is_explicit_and_bounded():
     assert _matches_elevation(1000, "600–1,000 m")
     assert _matches_elevation(1200, "Above 1,000 m")
     assert not _matches_elevation(None, "Above 1,000 m")
+
+
+def test_no_forecast_candidate_produces_a_clear_error():
+    class EmptyForecast(StubForecast):
+        def candidates(self, *_args):
+            return []
+
+    analysis = BeeMoveAnalysis(
+        geo=StubGeo(),
+        forecast=EmptyForecast(),
+        phenology=StubPhenology(),
+        landscape=StubLandscape(),
+        pollen=StubPollen(),
+        routing=StubRouting(),
+    )
+
+    with pytest.raises(ValueError, match="Nessuna località MeteoSwiss"):
+        analysis.run("St. Gallen", 10)
+
+
+def test_meteoswiss_height_is_used_only_when_geoadmin_height_is_unavailable():
+    class GeoWithoutHeight(StubGeo):
+        def height(self, _easting, _northing):
+            return None
+
+    analysis = BeeMoveAnalysis(
+        geo=GeoWithoutHeight(),
+        forecast=StubForecast(),
+        phenology=StubPhenology(),
+        landscape=StubLandscape(),
+        pollen=StubPollen(),
+        routing=StubRouting(),
+    )
+
+    result = analysis.run("St. Gallen", 50)["results"][0]
+
+    assert result["height_m"] == StubForecast.point.metadata_height
+    assert result["height_source"] == "meteoswiss_metadata"
+
+
+def test_road_distance_is_computed_for_every_alternative_before_final_ranking():
+    class ManyForecasts(StubForecast):
+        points = [
+            replace(
+                StubForecast.point,
+                point_id=f"point-{index}",
+                name=f"Place {index}",
+                lat=47.428 + index / 100,
+                distance_km=float(index),
+            )
+            for index in range(8)
+        ]
+
+        def candidates(self, *_args):
+            return self.points
+
+        def forecasts(self, points):
+            return {
+                point.key: [
+                    {"date": "2026-09-29", "flight_score": 70, "flight_hours": 8}
+                ]
+                for point in points
+            }, {"updated": "2026-09-29T00:00:00Z"}
+
+    class RecordingRouting:
+        enabled = True
+
+        def __init__(self):
+            self.destinations = []
+
+        def route(self, _origin, destination):
+            self.destinations.append(destination)
+            return {"distance_km": 12.0, "duration_minutes": 20}
+
+    routing = RecordingRouting()
+    analysis = BeeMoveAnalysis(
+        geo=StubGeo(),
+        forecast=ManyForecasts(),
+        phenology=StubPhenology(),
+        landscape=StubLandscape(),
+        pollen=StubPollen(),
+        routing=routing,
+        max_candidates=8,
+    )
+
+    result = analysis.run("St. Gallen", 50)
+
+    assert len(routing.destinations) == 7
+    assert all(
+        candidate["route"] is not None
+        for candidate in result["results"]
+        if not candidate["is_origin_area"]
+    )
+    assert result["sources"]["openrouteservice"] == {
+        "configured": True,
+        "successful_routes": 7,
+    }

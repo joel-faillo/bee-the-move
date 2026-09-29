@@ -11,8 +11,10 @@ from __future__ import annotations
 
 from services.http import HttpClient
 
-# HeiGIT replaced the former api.openrouteservice.org host in 2026.
+# Public endpoint currently documented for the openrouteservice instance
+# hosted by HeiGIT.
 ORS_URL = "https://api.heigit.org/openrouteservice/v2/directions/driving-car/geojson"
+SNAP_RADIUS_METRES = 2_000
 
 
 class RoutingService:
@@ -34,7 +36,15 @@ class RoutingService:
             return None
         data = self.http.post_json(
             ORS_URL,
-            {"coordinates": [[origin[1], origin[0]], [destination[1], destination[0]]]},
+            {
+                "coordinates": [[origin[1], origin[0]], [destination[1], destination[0]]],
+                # GeoAdmin place labels and MeteoSwiss forecast points are
+                # geographic reference points, not guaranteed road addresses.
+                # The public API permits up to 2 km for snapping them to the
+                # nearest drivable segment; without this, valid Ticino and
+                # Alpine searches can fail even though a road route exists.
+                "radiuses": [SNAP_RADIUS_METRES, SNAP_RADIUS_METRES],
+            },
             headers={"Authorization": self.api_key},
         )
         summary = data["features"][0]["properties"]["summary"]

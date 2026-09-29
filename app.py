@@ -1,7 +1,7 @@
 """Bee the Move - one guided Streamlit workflow.
 
 AI assistance citation: OpenAI Codex helped draft and revise this interface
-between 21 and 28 September 2026. The project team must review the code and
+between 21 and 29 September 2026. The project team must review the code and
 describe that use in the submitted video and list of aids. See
 ``AI_ASSISTANCE.md`` for prompts, scope and the full reference.
 """
@@ -43,6 +43,26 @@ from ui.map import map_html
 
 load_dotenv()
 st.set_page_config(page_title="Bee the Move", page_icon="🐝", layout="wide")
+
+RADIUS_OPTIONS = (10, 20, 30, 40, 50, 60, 75, 100)
+FORAGE_OPTIONS = ("Balanced mix", *FORAGE_CATEGORIES)
+ELEVATION_OPTIONS = (
+    "Any elevation",
+    "Below 600 m",
+    "600–1,000 m",
+    "Above 1,000 m",
+)
+INSTALLATION_OPTIONS = ("Bee house", "Hives without a bee house", "Other")
+SITE_PLAN_OPTIONS = ("Yes", "No")
+DURATION_OPTIONS = ("Fixed term", "Open-ended")
+NOTICE_PERIOD_OPTIONS = ("Not selected", "3 months", "6 months", "9 months", "12 months")
+NOTICE_TIMING_OPTIONS = (
+    "Not selected",
+    "Any time",
+    "At month end",
+    "Only on a specified date",
+)
+COMPENSATION_PERIOD_OPTIONS = ("Not selected", "Year", "Month")
 
 
 @st.cache_resource
@@ -117,7 +137,7 @@ def _intro() -> None:
         a, b, c = st.columns(3)
         a.markdown('<div class="step"><b>1 · Search</b><br>Choose a Swiss place or postcode from official suggestions.</div>', unsafe_allow_html=True)
         b.markdown('<div class="step"><b>2 · Compare</b><br>Understand flowering, forage, flight weather and distance.</div>', unsafe_allow_html=True)
-        c.markdown('<div class="step"><b>3 · Prepare</b><br>Fill your details once and download official documents.</div>', unsafe_allow_html=True)
+        c.markdown('<div class="step"><b>3 · Prepare</b><br>Fill your details once and download prefilled source documents.</div>', unsafe_allow_html=True)
         st.caption("Decision support is not a field inspection, land permission or health clearance.")
 
 
@@ -137,20 +157,21 @@ def _search(analysis: BeeMoveAnalysis) -> None:
         )
     with radius_col:
         radius = st.selectbox(
-            "Maximum distance", [10, 20, 30, 40, 50, 60, 75, 100], index=4,
+            "Maximum search radius", RADIUS_OPTIONS, index=4,
             format_func=lambda value: f"{value} km",
+            help="Geographic radius used to find candidates. A calculated road route can be longer.",
         )
     with st.expander("Search preferences", expanded=False):
         forage_col, elevation_col = st.columns(2)
         with forage_col:
             forage_choice = st.selectbox(
-                "Forage focus", ["Balanced mix", *FORAGE_CATEGORIES],
+                "Forage focus", FORAGE_OPTIONS,
                 help="Optional ranking preference based on mapped agricultural land use. It is not a nectar measurement.",
             )
         with elevation_col:
             elevation_choice = st.selectbox(
                 "Elevation band",
-                ["Any elevation", "Below 600 m", "600–1,000 m", "Above 1,000 m"],
+                ELEVATION_OPTIONS,
                 help="Optional eligibility filter based on GeoAdmin terrain height. It does not add BeeScore points.",
             )
 
@@ -159,7 +180,7 @@ def _search(analysis: BeeMoveAnalysis) -> None:
 
     if st.button("Compare nearby areas", type="primary", width="stretch", disabled=selected is None):
         try:
-            with st.spinner("Comparing current Swiss public data…"):
+            with st.spinner("Comparing current weather with official Swiss datasets…"):
                 result = analysis.run(
                     selected, float(radius),
                     None if forage_choice == "Balanced mix" else forage_choice,
@@ -194,7 +215,7 @@ def _empty_state() -> None:
     st.divider()
     st.subheader("One search, one complete decision path")
     left, middle, right = st.columns(3)
-    left.markdown("**Live context**\n\nMeteoSwiss weather, phenology and pollen plus mapped agricultural resources.")
+    left.markdown("**Official data context**\n\nCurrent MeteoSwiss weather and pollen, historical phenology and annually mapped agricultural resources.")
     middle.markdown("**Explainable recommendation**\n\nEvery result shows its score components; your searched place is always retained.")
     right.markdown("**Practical next step**\n\nThe selected destination flows into the land agreement, stock record and notification draft.")
 
@@ -232,13 +253,20 @@ def _results(result: dict) -> dict:
         st.iframe(f"data:text/html;base64,{encoded}", height=540)
         st.caption(
             "Map controls switch each evidence layer on or off. Small pale-green dots are centroids of mapped "
-            "agricultural parcels; they are not flowering observations."
+            "agricultural parcels near the searched place; they are not flowering observations."
         )
     with detail_column:
         st.subheader(selected["name"])
         a, b = st.columns(2)
         a.metric("BeeScore", f"{selected['score']}/100")
-        b.metric("Distance", "Searched area" if selected["is_origin_area"] else f"{selected['distance_km']:.1f} km")
+        route = selected.get("route")
+        if selected["is_origin_area"]:
+            distance_label, distance_value = "Distance", "Searched area"
+        elif route:
+            distance_label, distance_value = "Road distance", f"{route['distance_km']:.1f} km"
+        else:
+            distance_label, distance_value = "Direct distance", f"{selected['distance_km']:.1f} km"
+        b.metric(distance_label, distance_value)
         st.caption("The searched area stays visible even when it is not among the three best scores.")
         for key, title in (
             ("forage", "Flowering & mapped forage"),
@@ -274,8 +302,8 @@ def _results(result: dict) -> dict:
         b.caption(", ".join(selected["landscape"].get("top_resources", [])) or "No mapped categories returned.")
         pollen = result.get("pollen", {})
         if pollen.get("available"):
-            c.metric("Nearest pollen station", pollen.get("station", "Available"))
-            c.caption(f"{pollen.get('station_distance_km')} km away · {pollen.get('timestamp')} · context only.")
+            c.metric("Pollen station near searched place", pollen.get("station", "Available"))
+            c.caption(f"{pollen.get('station_distance_km')} km from the searched place · {pollen.get('timestamp')} · context only.")
         else:
             c.metric("Pollen context", "Not available")
             c.caption("Pollen is never used as a proxy for nectar.")
@@ -293,6 +321,18 @@ def _results(result: dict) -> dict:
                 f"Held-out model MAE: {selected['flowering'].get('model_mae_days')} days; "
                 f"historical-median baseline: {selected['flowering'].get('baseline_mae_days')} days."
             )
+        freshness = []
+        forecast_updated = result.get("sources", {}).get("meteoswiss_forecast", {}).get("updated")
+        if forecast_updated:
+            freshness.append(f"forecast updated {_source_timestamp(forecast_updated)}")
+        reference_year = selected.get("landscape", {}).get("reference_year")
+        if reference_year:
+            freshness.append(f"agricultural land use {reference_year}")
+        model_source = selected.get("flowering", {}).get("source_updated")
+        if model_source:
+            freshness.append(f"flowering-model source snapshot {_source_timestamp(model_source)}")
+        if freshness:
+            st.caption("Data freshness · " + " · ".join(freshness))
     return selected
 
 
@@ -301,7 +341,7 @@ def _move_preparation(analysis: BeeMoveAnalysis, result: dict, destination: dict
     st.header("Prepare this hive move")
     st.write(
         f"Selected destination: **{destination['name']}**. Complete the guided fields once; "
-        "Bee the Move inserts them into copies of the official documents."
+        "Bee the Move inserts them into copies of the original source documents."
     )
     origin_canton = _safe_canton(analysis, result["origin"])
     destination_canton = _safe_canton(analysis, destination)
@@ -347,22 +387,22 @@ def _move_preparation(analysis: BeeMoveAnalysis, result: dict, destination: dict
         )
         installation = st.radio(
             "Installation on the site",
-            ["Bee house", "Hives without a bee house", "Other"], horizontal=True,
+            INSTALLATION_OPTIONS, horizontal=True,
             help="Choose the wording that the official agreement should tick.",
         )
         other_installation = st.text_input(
             "Describe the installation", placeholder="e.g. four magazine hives"
         ) if installation == "Other" else ""
         site_plan = st.radio(
-            "Will a plan showing the site and access be attached?", ["Yes", "No"], horizontal=True,
+            "Will a plan showing the site and access be attached?", SITE_PLAN_OPTIONS, horizontal=True,
         )
         a, b, c = st.columns(3)
         start_date = a.date_input("Use begins", value=date.today() + timedelta(days=1))
-        duration = b.radio("Duration", ["Fixed term", "Open-ended"], horizontal=True)
+        duration = b.radio("Duration", DURATION_OPTIONS, horizontal=True)
         end_date = c.date_input("Fixed term ends", value=date.today() + timedelta(days=90), disabled=duration == "Open-ended")
         a, b = st.columns(2)
-        notice_period = a.selectbox("Notice period", ["Not selected", "3 months", "6 months", "9 months", "12 months"])
-        notice_timing = b.selectbox("Notice can end", ["Not selected", "Any time", "At month end", "Only on a specified date"])
+        notice_period = a.selectbox("Notice period", NOTICE_PERIOD_OPTIONS)
+        notice_timing = b.selectbox("Notice can end", NOTICE_TIMING_OPTIONS)
         specified_notice_date = st.text_input(
             "Specified notice date or rule", placeholder="e.g. 31 October each year"
         ) if notice_timing == "Only on a specified date" else ""
@@ -380,7 +420,7 @@ def _move_preparation(analysis: BeeMoveAnalysis, result: dict, destination: dict
         compensation = a.text_input(
             "Compensation amount / description (optional)", placeholder="e.g. CHF 100"
         )
-        compensation_period = b.radio("Compensation period", ["Not selected", "Year", "Month"], horizontal=True)
+        compensation_period = b.radio("Compensation period", COMPENSATION_PERIOD_OPTIONS, horizontal=True)
 
         st.subheader("3 · Apiary and movement record")
         a, b, c = st.columns(3)
@@ -456,7 +496,7 @@ def _move_preparation(analysis: BeeMoveAnalysis, result: dict, destination: dict
 
     prepared = st.session_state.get("prepared_documents")
     if prepared and prepared.get("destination") == destination["name"]:
-        st.success("Ready for review: the original official templates have been prefilled.")
+        st.success("Ready for review: the original source templates have been prefilled.")
         left, right = st.columns(2)
         left.download_button(
             "Download filled BienenSchweiz agreement", prepared["agreement"],
@@ -544,14 +584,17 @@ def _method_and_sources(analysis: BeeMoveAnalysis) -> None:
             b.metric("Baseline MAE", f"{metrics['baseline_mae_days']} days")
             c.metric("Training observations", f"{metrics['training_rows']:,}")
         sources = [
-            ("GeoAdmin Search & Height", "Location, coordinates and elevation", "https://docs.geo.admin.ch/access-data/"),
+            ("GeoAdmin Search", "Place and postcode suggestions", "https://docs.geo.admin.ch/access-data/search.html"),
+            ("GeoAdmin Height", "Terrain elevation", "https://docs.geo.admin.ch/access-data/get-point-height.html"),
+            ("GeoAdmin Identify", "Origin and destination canton", "https://docs.geo.admin.ch/access-data/identify-features.html"),
             ("MeteoSwiss Local Forecast", "Bee-flight weather", "https://opendatadocs.meteoswiss.ch/e-forecast-data/e4-local-forecast-data"),
             ("MeteoSwiss Phenology", "ML training observations", "https://opendatadocs.meteoswiss.ch/a-data-groundbased/a9-phenological-observations"),
             ("MeteoSwiss Pollen", "Regional context only", "https://opendatadocs.meteoswiss.ch/a-data-groundbased/a7-pollen-stations"),
-            ("Agricultural land use", "Mapped forage categories", "https://opendata.swiss/en/dataset/landwirtschaftliche-nutzungsflachen-schweiz"),
+            ("Agricultural land use", "Annual parcels used by the app's forage heuristic", "https://opendata.swiss/en/dataset/landwirtschaftliche-nutzungsflachen-schweiz"),
             ("swisstopo Vector Tiles", "Official map", "https://docs.geo.admin.ch/visualize-data/vector-tiles.html"),
             ("BLV", "Federal stock-control form and movement guidance", FSVO_BEES_URL),
-            ("BienenSchweiz", "Official site-agreement template", LAND_AGREEMENT_SOURCE_URL),
+            ("BienenSchweiz", "Original association sample agreement", LAND_AGREEMENT_SOURCE_URL),
+            ("openrouteservice / HeiGIT", "Optional road distance", "https://giscience.github.io/openrouteservice/api-reference/endpoints/directions/"),
         ]
         st.dataframe(
             pd.DataFrame(sources, columns=["Source", "Contribution", "Official link"]),
@@ -561,7 +604,7 @@ def _method_and_sources(analysis: BeeMoveAnalysis) -> None:
         st.warning(
             "A high BeeScore is not proof of current nectar, flowering on a specific parcel, land permission or legal clearance. Check the site and competent authorities."
         )
-        st.markdown('<p class="source-note">Official templates downloaded from their source pages and checked on 22 September 2026. Source: MeteoSwiss for MeteoSwiss data.</p>', unsafe_allow_html=True)
+        st.markdown('<p class="source-note">BLV official form and BienenSchweiz sample agreement downloaded on 22 September 2026; online source files reverified on 29 September 2026. Source: MeteoSwiss for MeteoSwiss data.</p>', unsafe_allow_html=True)
 
 
 def _safe_canton(analysis: BeeMoveAnalysis, place: dict) -> dict | None:
@@ -576,10 +619,22 @@ def _candidate_summary(candidate: dict) -> str:
     dates = f"{period['from']} to {period['to']}" if period else "not available"
     route = candidate.get("route")
     distance = (
-        f"Road route: {route['distance_km']} km, {route['duration_minutes']} min"
+        f"Road route to the nearest routable road: {route['distance_km']} km, "
+        f"{route['duration_minutes']} min"
         if route else "Distance shown is direct (Haversine)"
     )
-    return f"Best modelled period: {dates}. {distance}."
+    flowering_score = candidate.get("flowering", {}).get("score")
+    low_signal = (
+        " Flowering signal remains low throughout this window."
+        if flowering_score is not None and flowering_score < 25
+        else ""
+    )
+    return f"Best relative period within the next seven days: {dates}. {distance}.{low_signal}"
+
+
+def _source_timestamp(value: str) -> str:
+    """Turn an ISO source timestamp into a compact, readable UTC label."""
+    return value.replace("T", " ")[:16] + " UTC"
 
 
 if __name__ == "__main__":

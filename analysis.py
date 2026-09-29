@@ -182,7 +182,7 @@ class BeeMoveAnalysis:
         if self.routing.enabled:
             route_targets = [
                 candidate
-                for candidate in candidates[:6]
+                for candidate in candidates
                 if not candidate["is_origin_area"]
             ]
             for candidate in route_targets:
@@ -256,7 +256,12 @@ class BeeMoveAnalysis:
                 "meteoswiss_pollen": pollen.get("available", False),
                 "agricultural_land_use": landscape_available,
                 "swisstopo_vector_tiles": True,
-                "openrouteservice": self.routing.enabled,
+                "openrouteservice": {
+                    "configured": self.routing.enabled,
+                    "successful_routes": sum(
+                        bool(candidate.get("route")) for candidate in candidates
+                    ),
+                },
             },
         }
 

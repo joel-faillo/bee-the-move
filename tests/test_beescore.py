@@ -7,6 +7,7 @@ from beescore import (
 )
 from services.geo import haversine_km
 from services.landscape import FORAGE_CATEGORIES, _forage_value, _lv95_to_wgs84
+import pytest
 
 
 def test_haversine_st_gallen_to_appenzell_is_reasonable():
@@ -53,6 +54,25 @@ def test_landscape_values_real_forage_above_cereals():
     meadow, _ = _forage_value("Extensiv genutzte Wiesen")
     wheat, _ = _forage_value("Winterweizen")
     assert orchard > meadow > wheat
+
+
+@pytest.mark.parametrize(
+    ("source_name", "category"),
+    [
+        ("Hochstamm-Feldobstbäume", "Orchards and high-stem fruit trees"),
+        ("Raps", "Rapeseed"),
+        ("Buntbrache", "Flower strips and biodiversity areas"),
+        ("Sonnenblumen", "Flowering crops"),
+        ("Extensiv genutzte Wiesen", "Meadows"),
+        ("Dauerweide", "Pastures"),
+        ("Luzerne", "Clover and lucerne"),
+        ("Rebfläche", "Other agricultural vegetation"),
+        ("Winterweizen", "Low-forage arable crops"),
+    ],
+)
+def test_every_forage_filter_has_a_real_source_mapping(source_name, category):
+    _value, mapped = _forage_value(source_name)
+    assert mapped == category
 
 
 def test_every_search_filter_is_a_real_landscape_category():
