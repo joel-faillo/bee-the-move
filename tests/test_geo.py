@@ -29,6 +29,22 @@ class FakeHttp:
                         "lon": 9.3622,
                     }
                 },
+                {
+                    "attrs": {
+                        "label": "<b>St. Gallen</b>",
+                        "origin": "district",
+                        "lat": 47.4,
+                        "lon": 9.3,
+                    }
+                },
+                {
+                    "attrs": {
+                        "label": "<b>St. Gallen</b>",
+                        "origin": "kantone",
+                        "lat": 47.4,
+                        "lon": 9.3,
+                    }
+                },
             ]
         }
 
@@ -51,6 +67,7 @@ def test_suggestions_include_places_and_postal_codes_only():
     results = GeoAdminService(FakeHttp()).suggest("9000")
     assert [item["kind"] for item in results] == ["Place", "Postal code (CAP)"]
     assert results[1]["label"] == "9000 - St. Gallen"
+    assert results[1]["postal_code"] == "9000"
 
 
 def test_canton_is_resolved_from_official_boundary_layer():

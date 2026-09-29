@@ -11,6 +11,7 @@ from services.official_documents import (
     AUTHORSHIP_DECLARATION,
     LAND_AGREEMENT_TEMPLATE,
     STOCK_CONTROL_TEMPLATE,
+    STOCK_CONTROL_TEMPLATES,
 )
 
 
@@ -85,15 +86,46 @@ def test_stock_control_keeps_official_tables_and_prefills_first_move():
     assert movement[4].text == "8"
 
 
+@pytest.mark.parametrize(
+    ("language", "title", "name_row", "bee_type"),
+    [
+        ("de", "Bestandeskontrolle", 4, "Bienenvolk (V)"),
+        ("fr", "Registre de colonies", 5, "Colonie d’abeilles (C)"),
+        ("it", "Controllo degli effettivi", 4, "Colonia di api (C)"),
+    ],
+)
+def test_every_official_blv_language_uses_its_own_original_template(
+    language, title, name_row, bee_type
+):
+    document = Document(BytesIO(fill_stock_control(_data(), language)))
+
+    assert document.paragraphs[0].text.startswith(title)
+    assert document.tables[0].cell(name_row, 1).text == "Joel Beispiel"
+    assert document.tables[0].cell(5, 5).text == "9050 Appenzell"
+    assert document.tables[1].cell(2, 5).text == bee_type
+
+
 def test_generators_never_modify_the_bundled_official_templates():
     pdf_before = LAND_AGREEMENT_TEMPLATE.read_bytes()
-    docx_before = STOCK_CONTROL_TEMPLATE.read_bytes()
+    docx_before = {
+        language: template.read_bytes()
+        for language, template in STOCK_CONTROL_TEMPLATES.items()
+    }
 
     fill_land_agreement(_data())
-    fill_stock_control(_data())
+    for language in STOCK_CONTROL_TEMPLATES:
+        fill_stock_control(_data(), language)
 
     assert LAND_AGREEMENT_TEMPLATE.read_bytes() == pdf_before
-    assert STOCK_CONTROL_TEMPLATE.read_bytes() == docx_before
+    assert {
+        language: template.read_bytes()
+        for language, template in STOCK_CONTROL_TEMPLATES.items()
+    } == docx_before
+
+
+def test_unknown_stock_control_language_is_rejected():
+    with pytest.raises(ValueError, match="Unsupported BLV document language"):
+        fill_stock_control(_data(), "en")
 
 
 @pytest.mark.parametrize(

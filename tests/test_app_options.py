@@ -2,6 +2,7 @@ from streamlit.testing.v1 import AppTest
 
 from app import (
     COMPENSATION_PERIOD_OPTIONS,
+    DOCUMENT_LANGUAGE_OPTIONS,
     DURATION_OPTIONS,
     ELEVATION_OPTIONS,
     FORAGE_OPTIONS,
@@ -12,6 +13,8 @@ from app import (
     SITE_PLAN_OPTIONS,
     _candidate_summary,
     _location_suggestions,
+    _document_language_for_canton,
+    _postcode_and_town,
     _safe_canton,
     _source_timestamp,
 )
@@ -29,6 +32,7 @@ def _form_app():
 
     destination = {
         "name": "Appenzell",
+        "postal_code": "9050",
         "lat": 47.331,
         "lon": 9.409,
     }
@@ -85,6 +89,14 @@ def test_form_exposes_every_original_document_choice_without_errors():
     assert _by_label(at.radio, "Compensation period").options == list(
         COMPENSATION_PERIOD_OPTIONS
     )
+    assert _by_label(
+        at.selectbox, "Official BLV stock-control language"
+    ).options == list(DOCUMENT_LANGUAGE_OPTIONS)
+    assert _by_label(at.text_input, "Destination postcode and town").value == (
+        "9050 Appenzell"
+    )
+    assert _by_label(at.date_input, "Use begins *").value is None
+    assert _by_label(at.date_input, "Planned move date *").value is None
 
 
 def test_conditional_form_options_show_their_matching_fields():
@@ -99,7 +111,7 @@ def test_conditional_form_options_show_their_matching_fields():
     assert _by_label(at.text_input, "Specified notice date or rule")
 
     _by_label(at.radio, "Duration").set_value("Open-ended").run()
-    assert _by_label(at.date_input, "Fixed term ends").disabled
+    assert all(item.label != "Fixed term ends *" for item in at.date_input)
 
 
 def test_every_form_selector_value_can_be_selected():
@@ -111,6 +123,7 @@ def test_every_form_selector_value_can_be_selected():
         (at.selectbox, "Notice period", NOTICE_PERIOD_OPTIONS),
         (at.selectbox, "Notice can end", NOTICE_TIMING_OPTIONS),
         (at.radio, "Compensation period", COMPENSATION_PERIOD_OPTIONS),
+        (at.selectbox, "Official BLV stock-control language", DOCUMENT_LANGUAGE_OPTIONS),
     )
     for _elements, label, options in groups:
         for value in options:
@@ -131,6 +144,7 @@ def test_location_autocomplete_formats_verified_choices_and_fails_closed():
             return [{
                 "label": "9000 - St. Gallen",
                 "kind": "Postal code (CAP)",
+                "postal_code": "9000",
                 "lat": 47.425,
                 "lon": 9.376,
             }]
@@ -145,6 +159,7 @@ def test_location_autocomplete_formats_verified_choices_and_fails_closed():
             {
                 "label": "9000 - St. Gallen",
                 "kind": "Postal code (CAP)",
+                "postal_code": "9000",
                 "lat": 47.425,
                 "lon": 9.376,
             },
@@ -160,6 +175,19 @@ def test_location_autocomplete_formats_verified_choices_and_fails_closed():
         geo = BrokenGeo()
 
     assert _location_suggestions(BrokenAnalysis(), "9000") == []
+
+
+def test_destination_address_and_document_language_defaults_are_explicit():
+    assert _postcode_and_town({"name": "Appenzell", "postal_code": "9050"}) == (
+        "9050 Appenzell"
+    )
+    assert _postcode_and_town({"name": "9000 - St. Gallen", "postal_code": "9000"}) == (
+        "9000 St. Gallen"
+    )
+    assert _postcode_and_town({"name": "Appenzell"}) == "Appenzell"
+    assert _document_language_for_canton("TI") == "Italiano"
+    assert _document_language_for_canton("VD") == "Français"
+    assert _document_language_for_canton("SG") == "Deutsch"
 
 
 def test_candidate_summary_distinguishes_road_and_direct_distance():

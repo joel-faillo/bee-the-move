@@ -16,10 +16,12 @@ from __future__ import annotations
 # Cantonal Veterinarians instead of the former static BLV PDF.
 VETERINARY_DIRECTORY_URL = "https://www.kantonstieraerzte.ch/uber-uns.html"
 FSVO_BEES_URL = "https://www.blv.admin.ch/de/bienen"
-FSVO_STOCK_CONTROL_TEMPLATE_URL = (
-    "https://www.blv.admin.ch/dam/de/sd-web/keeNTCMwOYVC/"
-    "vorlage-bestandeskontrolle-bienenvoelker-de.docx"
-)
+FSVO_STOCK_CONTROL_TEMPLATE_URLS = {
+    "de": "https://www.blv.admin.ch/dam/de/sd-web/keeNTCMwOYVC/vorlage-bestandeskontrolle-bienenvoelker-de.docx",
+    "fr": "https://www.blv.admin.ch/dam/fr/sd-web/keeNTCMwOYVC/vorlage-bestandeskontrolle-bienenvoelker-fr.docx",
+    "it": "https://www.blv.admin.ch/dam/it/sd-web/keeNTCMwOYVC/vorlage-bestandeskontrolle-bienenvoelker-it.docx",
+}
+FSVO_STOCK_CONTROL_TEMPLATE_URL = FSVO_STOCK_CONTROL_TEMPLATE_URLS["de"]
 FSVO_STOCK_CONTROL_GUIDE_URL = (
     "https://www.blv.admin.ch/dam/de/sd-web/dQWh4Q6Qxpng/"
     "anleitung-fuehren-bestandeskontrolle-bienen-de.pdf"

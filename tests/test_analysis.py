@@ -120,6 +120,29 @@ def test_selected_autocomplete_coordinates_are_not_geocoded_again():
     }
 
 
+def test_selected_postcode_reaches_the_searched_destination():
+    analysis = BeeMoveAnalysis(
+        geo=StubGeo(),
+        forecast=StubForecast(),
+        phenology=StubPhenology(),
+        landscape=StubLandscape(),
+        pollen=StubPollen(),
+        routing=StubRouting(),
+    )
+
+    result = analysis.run(
+        {
+            "label": "9000 - St. Gallen",
+            "postal_code": "9000",
+            "lat": 47.4245,
+            "lon": 9.3767,
+        },
+        10,
+    )
+
+    assert result["results"][0]["postal_code"] == "9000"
+
+
 def test_elevation_filter_is_explicit_and_bounded():
     assert _matches_elevation(450, "Below 600 m")
     assert not _matches_elevation(700, "Below 600 m")

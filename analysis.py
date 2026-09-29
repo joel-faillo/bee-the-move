@@ -68,6 +68,8 @@ class BeeMoveAnalysis:
                 "lat": float(location["lat"]),
                 "lon": float(location["lon"]),
             }
+            if location.get("postal_code"):
+                origin["postal_code"] = location["postal_code"]
         else:
             origin = self.geo.geocode(location)
         points = self.forecast.candidates(
@@ -150,7 +152,10 @@ class BeeMoveAnalysis:
             score = calculate(forage, weather, continuity, logistics)
             return {
                 "name": origin["name"] if is_origin_area else point.name,
-                "postal_code": point.postal_code,
+                "postal_code": (
+                    origin.get("postal_code") or point.postal_code
+                    if is_origin_area else point.postal_code
+                ),
                 "lat": origin["lat"] if is_origin_area else point.lat,
                 "lon": origin["lon"] if is_origin_area else point.lon,
                 "distance_km": display_distance,

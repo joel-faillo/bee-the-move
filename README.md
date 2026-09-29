@@ -35,8 +35,9 @@ Without a key, the app clearly uses direct Haversine distance.
 ## User flow
 
 1. Type a Swiss place or postcode. Nothing is preselected; the user must choose
-   one official GeoAdmin suggestion.
-2. Choose a direct geographic search radius up to 100 km and, optionally, one mapped forage category
+   one official GeoAdmin suggestion. The autocomplete excludes canton and
+   district centroids because they are too broad for an apiary location.
+2. Choose a direct geographic search radius from 2 to 50 km and, optionally, one mapped forage category
    or elevation band. Elevation is an eligibility filter, not a hidden score
    bonus.
 3. Compare the best areas. The searched area is always retained, even when it
@@ -48,9 +49,11 @@ Without a key, the app clearly uses direct Haversine distance.
    readable.
 5. Select a destination and enter the beekeeper, land, contract and movement
    details in the same page.
-6. Download prefilled copies of the original BienenSchweiz sample site
-   agreement and the official BLV stock-control form.
-7. Review the official guidance for the detected origin and destination
+6. Enter dates in Swiss day/month/year order. Open-ended agreements do not
+   request or insert a fixed-term end date.
+7. Download prefilled copies of the original German BienenSchweiz sample site
+   agreement and the official German, French or Italian BLV stock-control form.
+8. Review the official guidance for the detected origin and destination
    cantons. The app prepares a German, French or Italian email **requesting
    confirmation** of the procedure; it is not itself a notification or permit.
 
@@ -112,7 +115,9 @@ The output estimates seasonal timing, not field-level flowering or nectar.
 | [Swiss agricultural land use](https://opendata.swiss/en/dataset/landwirtschaftliche-nutzungsflachen-schweiz) | Annual agricultural parcels used by the app's explicit forage heuristic |
 | [swisstopo Vector Tiles](https://docs.geo.admin.ch/visualize-data/vector-tiles.html) | Official map |
 | [BLV bee guidance](https://www.blv.admin.ch/de/bienen) | Registration, identification and movement rules |
-| [BLV stock-control template](https://www.blv.admin.ch/dam/de/sd-web/keeNTCMwOYVC/vorlage-bestandeskontrolle-bienenvoelker-de.docx) | Original federal Word form, published 21 April 2026 |
+| [BLV stock-control template (German)](https://www.blv.admin.ch/dam/de/sd-web/keeNTCMwOYVC/vorlage-bestandeskontrolle-bienenvoelker-de.docx) | Original federal Word form, published 21 April 2026 |
+| [BLV stock-control template (French)](https://www.blv.admin.ch/dam/fr/sd-web/keeNTCMwOYVC/vorlage-bestandeskontrolle-bienenvoelker-fr.docx) | Original federal Word form, published 21 April 2026 |
+| [BLV stock-control template (Italian)](https://www.blv.admin.ch/dam/it/sd-web/keeNTCMwOYVC/vorlage-bestandeskontrolle-bienenvoelker-it.docx) | Original federal Word form, published 21 April 2026 |
 | [BLV stock-control instructions](https://www.blv.admin.ch/dam/de/sd-web/dQWh4Q6Qxpng/anleitung-fuehren-bestandeskontrolle-bienen-de.pdf) | Official instructions, published 24 June 2026 |
 | Official cantonal bee/veterinary pages | Current local procedure, contacts and restriction-zone entry points for all 26 cantons |
 | [BienenSchweiz sample site agreement](https://bienen.ch/wp-content/uploads/2022/11/Mustervereinbarung_fuer_Platz_fuer_Bienenhaltung_Formular.pdf) | Original association sample agreement |
@@ -126,11 +131,13 @@ internal-canton exception in Neuchâtel, and clearance requirements in Ticino.
 Temporary restriction zones can change at any time, so the app always links to
 the deciding official source instead of claiming automatic legal clearance.
 
-The BLV official form and the BienenSchweiz sample agreement are bundled in
-`static/forms/` so downloads remain reliable. They were downloaded on 22
-September 2026, and both online source files were reverified byte-for-byte on
-29 September 2026. The app only inserts user data into copies; it does not
-alter the source clauses or create an authorisation.
+The three BLV official language forms and the German BienenSchweiz sample
+agreement are bundled unchanged in `static/forms/` so downloads remain
+reliable. The German files were downloaded on 22 September 2026; the French
+and Italian BLV files were downloaded from the official pages on 29 September
+2026. The online sources were reverified on 29 September 2026. The app only
+inserts user data into copies; it does not alter the source clauses or create
+an authorisation.
 
 The official HSG Declaration of Authorship supplied with the assignment is
 also included unchanged as `static/forms/hsg-declaration-of-authorship.pdf`.

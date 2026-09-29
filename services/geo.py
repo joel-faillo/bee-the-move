@@ -16,7 +16,9 @@ SEARCH_URL = "https://api3.geo.admin.ch/rest/services/ech/SearchServer"
 HEIGHT_URL = "https://api3.geo.admin.ch/rest/services/height"
 IDENTIFY_URL = "https://api3.geo.admin.ch/rest/services/ech/MapServer/identify"
 CANTON_LAYER = "ch.swisstopo.swissboundaries3d-kanton-flaeche.fill"
-PLACE_ORIGINS = {"zipcode", "gg25", "district", "kantone"}
+# A hive origin must be a concrete municipality/place or postcode. District
+# and canton centroids are too broad and created ambiguous duplicate labels.
+PLACE_ORIGINS = {"zipcode", "gg25"}
 
 
 def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -68,11 +70,7 @@ class GeoAdminService:
             label = html.unescape(
                 re.sub(r"<[^>]+>", "", attrs.get("label", ""))
             ).strip()
-            key = (
-                label.casefold(),
-                round(float(attrs["lat"]), 5),
-                round(float(attrs["lon"]), 5),
-            )
+            key = (origin, label.casefold())
             if not label or key in seen:
                 continue
             seen.add(key)
@@ -81,6 +79,7 @@ class GeoAdminService:
                     "label": label,
                     "search_text": label,
                     "kind": "Postal code (CAP)" if origin == "zipcode" else "Place",
+                    "postal_code": label.split(" - ", 1)[0] if origin == "zipcode" else "",
                     "lat": float(attrs["lat"]),
                     "lon": float(attrs["lon"]),
                 }

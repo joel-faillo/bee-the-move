@@ -21,7 +21,39 @@ from pypdf import PdfReader, PdfWriter
 FORMS_DIRECTORY = Path(__file__).resolve().parents[1] / "static" / "forms"
 LAND_AGREEMENT_TEMPLATE = FORMS_DIRECTORY / "bienenschweiz-land-agreement.pdf"
 STOCK_CONTROL_TEMPLATE = FORMS_DIRECTORY / "blv-stock-control.docx"
+STOCK_CONTROL_TEMPLATES = {
+    "de": STOCK_CONTROL_TEMPLATE,
+    "fr": FORMS_DIRECTORY / "blv-stock-control-fr.docx",
+    "it": FORMS_DIRECTORY / "blv-stock-control-it.docx",
+}
 AUTHORSHIP_DECLARATION = FORMS_DIRECTORY / "hsg-declaration-of-authorship.pdf"
+
+# The three official BLV documents use different table layouts. Coordinates
+# below point only to existing input cells; no labels or clauses are replaced.
+STOCK_CONTROL_LAYOUTS = {
+    "de": {
+        "title": "Bestandeskontrolle der Bienenvölker für das Jahr {year}",
+        "office": "Zuständiger Veterinärdienst",
+        "inspector": "Zuständiger Bieneninspektor",
+        "bee_type": "Bienenvolk (V)",
+        "beekeeper": {"number": (3, 1), "name": (4, 1), "street": (5, 1), "city": (6, 1), "phone": (7, 1), "email": (8, 1), "section": (9, 1)},
+    },
+    "fr": {
+        "title": "Registre de colonies d’abeilles pour l’année {year}",
+        "office": "Service vétérinaire compétent",
+        "inspector": "Inspecteur des ruchers compétent",
+        "bee_type": "Colonie d’abeilles (C)",
+        "beekeeper": {"number": (4, 1), "name": (5, 1), "street": (6, 1), "city": (7, 1), "phone": (8, 1), "email": (9, 1), "section": (10, 1)},
+    },
+    "it": {
+        "title": "Controllo degli effettivi delle colonie di api per l’anno {year}",
+        "office": "Servizio veterinario competente",
+        "inspector": "Ispettore degli apiari competente",
+        "bee_type": "Colonia di api (C)",
+        # The Italian source template has no separate beekeeper-number field.
+        "beekeeper": {"number": None, "name": (4, 1), "street": (5, 1), "city": (6, 1), "phone": (7, 1), "email": (8, 1), "section": (9, 1)},
+    },
+}
 
 
 def fill_land_agreement(data: dict) -> bytes:
@@ -108,29 +140,38 @@ def fill_land_agreement(data: dict) -> bytes:
     return output.getvalue()
 
 
-def fill_stock_control(data: dict) -> bytes:
-    """Return a filled copy of the current official FSVO/BLV Word form."""
-    document = Document(STOCK_CONTROL_TEMPLATE)
+def fill_stock_control(data: dict, language: str = "de") -> bytes:
+    """Return a filled copy of an official German, French or Italian BLV form."""
+    if language not in STOCK_CONTROL_TEMPLATES:
+        raise ValueError(f"Unsupported BLV document language: {language}")
+    layout = STOCK_CONTROL_LAYOUTS[language]
+    document = Document(STOCK_CONTROL_TEMPLATES[language])
     year = str(data.get("year") or date.today().year)
     title = document.paragraphs[0]
-    title.text = f"Bestandeskontrolle der Bienenvölker für das Jahr {year}"
+    title.text = layout["title"].format(year=year)
 
     details = document.tables[0]
     office = data.get("veterinary_office", "")
     inspector = data.get("bee_inspector", "") or "____________________________"
     details.cell(0, 0).text = (
-        f"Zuständiger Veterinärdienst: {office}\n\n"
-        f"Zuständiger Bieneninspektor: {inspector}"
+        f"{layout['office']}: {office}\n\n"
+        f"{layout['inspector']}: {inspector}"
     )
 
     # Left side: beekeeper. Right side: the selected destination apiary.
-    _set(details, 3, 1, data.get("beekeeper_number"))
-    _set(details, 4, 1, data.get("beekeeper"))
-    _set(details, 5, 1, data.get("beekeeper_street"))
-    _set(details, 6, 1, data.get("beekeeper_city"))
-    _set(details, 7, 1, data.get("phone"))
-    _set(details, 8, 1, data.get("email"))
-    _set(details, 9, 1, data.get("section"))
+    beekeeper_fields = layout["beekeeper"]
+    for key, data_key in {
+        "number": "beekeeper_number",
+        "name": "beekeeper",
+        "street": "beekeeper_street",
+        "city": "beekeeper_city",
+        "phone": "phone",
+        "email": "email",
+        "section": "section",
+    }.items():
+        position = beekeeper_fields[key]
+        if position:
+            _set(details, *position, data.get(data_key))
     _set(details, 3, 5, data.get("apiary_number"))
     _set(details, 4, 5, data.get("site_street"))
     _set(details, 5, 5, data.get("site_city"))
@@ -143,7 +184,7 @@ def fill_stock_control(data: dict) -> bytes:
     _set(movement, 2, 1, data.get("origin_apiary_number"))
     _set(movement, 2, 3, data.get("movement_reason") or "Verstellen")
     _set(movement, 2, 4, data.get("colonies"))
-    _set(movement, 2, 5, "Bienenvolk (V)")
+    _set(movement, 2, 5, layout["bee_type"])
 
     output = BytesIO()
     document.save(output)
