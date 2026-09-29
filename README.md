@@ -48,11 +48,15 @@ Without a key, the app clearly uses direct Haversine distance.
    pollen station; the last two context layers start hidden to keep the map
    readable.
 5. Select a destination and enter the beekeeper, land, contract and movement
-   details in the same page.
-6. Enter dates in Swiss day/month/year order. Open-ended agreements do not
-   request or insert a fixed-term end date.
-7. Download prefilled copies of the original German BienenSchweiz sample site
+   details in the same page. The recommended-area centre is only a reference:
+   enter the exact apiary or parcel coordinates for the official form.
+6. Enter dates in Swiss day/month/year order. Results, charts and source
+   timestamps use the same order. Open-ended agreements do not request or
+   insert a fixed-term end date.
+7. Download a prefilled copy of the original German BienenSchweiz sample site
    agreement and the official German, French or Italian BLV stock-control form.
+   Blank source links follow the selected BLV language where an official
+   version exists.
 8. Review the official guidance for the detected origin and destination
    cantons. The app prepares a German, French or Italian email **requesting
    confirmation** of the procedure; it is not itself a notification or permit.
@@ -120,7 +124,8 @@ The output estimates seasonal timing, not field-level flowering or nectar.
 | [BLV stock-control template (Italian)](https://www.blv.admin.ch/dam/it/sd-web/keeNTCMwOYVC/vorlage-bestandeskontrolle-bienenvoelker-it.docx) | Original federal Word form, published 21 April 2026 |
 | [BLV stock-control instructions](https://www.blv.admin.ch/dam/de/sd-web/dQWh4Q6Qxpng/anleitung-fuehren-bestandeskontrolle-bienen-de.pdf) | Official instructions, published 24 June 2026 |
 | Official cantonal bee/veterinary pages | Current local procedure, contacts and restriction-zone entry points for all 26 cantons |
-| [BienenSchweiz sample site agreement](https://bienen.ch/wp-content/uploads/2022/11/Mustervereinbarung_fuer_Platz_fuer_Bienenhaltung_Formular.pdf) | Original association sample agreement |
+| [BienenSchweiz sample site agreement (German)](https://bienen.ch/wp-content/uploads/2022/11/Mustervereinbarung_fuer_Platz_fuer_Bienenhaltung_Formular.pdf) | Original association sample agreement used for the prefilled PDF |
+| [SAR sample site agreement (French)](https://abeilles.ch/wp-content/uploads/sites/7/2023/03/Modele_de_convention_entre_proprietaire_terrien_et_apiculteur_version_imprimable.pdf) | Official French-language association version linked as a blank source |
 | [openrouteservice / HeiGIT](https://giscience.github.io/openrouteservice/api-reference/endpoints/directions/) | Optional road route through the hosted `api.heigit.org` endpoint |
 
 The 26 official cantonal entry points and the encoded local differences were
@@ -137,7 +142,9 @@ reliable. The German files were downloaded on 22 September 2026; the French
 and Italian BLV files were downloaded from the official pages on 29 September
 2026. The online sources were reverified on 29 September 2026. The app only
 inserts user data into copies; it does not alter the source clauses or create
-an authorisation.
+an authorisation. No official Swiss Italian or English site-agreement template,
+and no official English BLV stock-control template, was found; the app does not
+invent either version.
 
 The official HSG Declaration of Authorship supplied with the assignment is
 also included unchanged as `static/forms/hsg-declaration-of-authorship.pdf`.

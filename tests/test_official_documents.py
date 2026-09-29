@@ -80,7 +80,7 @@ def test_stock_control_keeps_official_tables_and_prefills_first_move():
     assert document.tables[0].cell(4, 1).text == "Joel Beispiel"
     assert document.tables[0].cell(6, 5).text == "47.3310/9.4090"
     movement = document.tables[1].rows[2].cells
-    assert movement[0].text == "15.4.26"
+    assert movement[0].text == "15/04/2026"
     assert movement[1].text == "SG-111"
     assert movement[3].text == "Verstellen"
     assert movement[4].text == "8"

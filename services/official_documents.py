@@ -180,7 +180,9 @@ def fill_stock_control(data: dict, language: str = "de") -> bytes:
     # The first free movement line records colonies arriving at the selected
     # destination. The remaining official table stays blank for later entries.
     movement = document.tables[1]
-    _set(movement, 2, 0, _short_date(data.get("move_date")), font_size=8)
+    # The official date column is narrow. Six-point text keeps the complete
+    # European date (DD/MM/YYYY) on one line without changing the template.
+    _set(movement, 2, 0, _short_date(data.get("move_date")), font_size=6)
     _set(movement, 2, 1, data.get("origin_apiary_number"))
     _set(movement, 2, 3, data.get("movement_reason") or "Verstellen")
     _set(movement, 2, 4, data.get("colonies"))
@@ -202,15 +204,11 @@ def _set(table, row: int, column: int, value, font_size: float | None = None) ->
 
 
 def _date(value) -> str:
-    return value.strftime("%d.%m.%Y") if hasattr(value, "strftime") else str(value or "")
+    return value.strftime("%d/%m/%Y") if hasattr(value, "strftime") else str(value or "")
 
 
 def _short_date(value) -> str:
-    return (
-        f"{value.day}.{value.month}.{str(value.year)[-2:]}"
-        if hasattr(value, "strftime")
-        else str(value or "")
-    )
+    return value.strftime("%d/%m/%Y") if hasattr(value, "strftime") else str(value or "")
 
 
 def _join(*parts) -> str:

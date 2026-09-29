@@ -12,6 +12,7 @@ from app import (
     RADIUS_OPTIONS,
     SITE_PLAN_OPTIONS,
     _candidate_summary,
+    _format_display_date,
     _location_suggestions,
     _document_language_for_canton,
     _postcode_and_town,
@@ -73,13 +74,13 @@ def test_every_search_selector_value_can_be_selected():
 def test_form_exposes_every_original_document_choice_without_errors():
     at = AppTest.from_function(_form_app, default_timeout=30).run()
     assert not at.exception
-    assert _by_label(at.radio, "Installation on the site").options == list(
+    assert _by_label(at.radio, "Installation on the site *").options == list(
         INSTALLATION_OPTIONS
     )
     assert _by_label(
-        at.radio, "Will a plan showing the site and access be attached?"
+        at.radio, "Will a plan showing the site and access be attached? *"
     ).options == list(SITE_PLAN_OPTIONS)
-    assert _by_label(at.radio, "Duration").options == list(DURATION_OPTIONS)
+    assert _by_label(at.radio, "Duration *").options == list(DURATION_OPTIONS)
     assert _by_label(at.selectbox, "Notice period").options == list(
         NOTICE_PERIOD_OPTIONS
     )
@@ -92,17 +93,21 @@ def test_form_exposes_every_original_document_choice_without_errors():
     assert _by_label(
         at.selectbox, "Official BLV stock-control language"
     ).options == list(DOCUMENT_LANGUAGE_OPTIONS)
-    assert _by_label(at.text_input, "Destination postcode and town").value == (
+    assert _by_label(at.text_input, "Destination postcode and town *").value == (
         "9050 Appenzell"
     )
+    assert _by_label(at.number_input, "Exact destination latitude *").value is None
+    assert _by_label(at.number_input, "Exact destination longitude *").value is None
     assert _by_label(at.date_input, "Use begins *").value is None
     assert _by_label(at.date_input, "Planned move date *").value is None
+    assert _by_label(at.text_input, "Property / parcel *").value == ""
+    assert _by_label(at.text_input, "Movement reason *").value == "Verstellen"
 
 
 def test_conditional_form_options_show_their_matching_fields():
     at = AppTest.from_function(_form_app, default_timeout=30).run()
 
-    _by_label(at.radio, "Installation on the site").set_value("Other").run()
+    _by_label(at.radio, "Installation on the site *").set_value("Other").run()
     assert _by_label(at.text_input, "Describe the installation")
 
     _by_label(at.selectbox, "Notice can end").set_value(
@@ -110,16 +115,19 @@ def test_conditional_form_options_show_their_matching_fields():
     ).run()
     assert _by_label(at.text_input, "Specified notice date or rule")
 
-    _by_label(at.radio, "Duration").set_value("Open-ended").run()
+    _by_label(at.radio, "Duration *").set_value("Fixed term").run()
+    assert _by_label(at.date_input, "Fixed term ends *").value is None
+
+    _by_label(at.radio, "Duration *").set_value("Open-ended").run()
     assert all(item.label != "Fixed term ends *" for item in at.date_input)
 
 
 def test_every_form_selector_value_can_be_selected():
     at = AppTest.from_function(_form_app, default_timeout=30).run()
     groups = (
-        (at.radio, "Installation on the site", INSTALLATION_OPTIONS),
-        (at.radio, "Will a plan showing the site and access be attached?", SITE_PLAN_OPTIONS),
-        (at.radio, "Duration", DURATION_OPTIONS),
+        (at.radio, "Installation on the site *", INSTALLATION_OPTIONS),
+        (at.radio, "Will a plan showing the site and access be attached? *", SITE_PLAN_OPTIONS),
+        (at.radio, "Duration *", DURATION_OPTIONS),
         (at.selectbox, "Notice period", NOTICE_PERIOD_OPTIONS),
         (at.selectbox, "Notice can end", NOTICE_TIMING_OPTIONS),
         (at.radio, "Compensation period", COMPENSATION_PERIOD_OPTIONS),
@@ -128,9 +136,9 @@ def test_every_form_selector_value_can_be_selected():
     for _elements, label, options in groups:
         for value in options:
             current_elements = at.radio if label in {
-                "Installation on the site",
-                "Will a plan showing the site and access be attached?",
-                "Duration",
+                "Installation on the site *",
+                "Will a plan showing the site and access be attached? *",
+                "Duration *",
                 "Compensation period",
             } else at.selectbox
             _by_label(current_elements, label).set_value(value).run()
@@ -203,6 +211,7 @@ def test_candidate_summary_distinguishes_road_and_direct_distance():
     assert "direct (Haversine)" in direct
     assert "nearest routable road: 12.4 km, 19 min" in routed
     assert "Best relative period within the next seven days" in direct
+    assert "30/09/2026 to 02/10/2026" in direct
 
 
 def test_candidate_summary_warns_when_flowering_signal_is_low():
@@ -217,7 +226,8 @@ def test_candidate_summary_warns_when_flowering_signal_is_low():
 
 
 def test_source_timestamp_is_compact_and_explicitly_utc():
-    assert _source_timestamp("2026-09-29T08:04:04.878211Z") == "2026-09-29 08:04 UTC"
+    assert _source_timestamp("2026-09-29T08:04:04.878211Z") == "29/09/2026 08:04 UTC"
+    assert _format_display_date("2026-10-02") == "02/10/2026"
 
 
 def test_canton_lookup_fails_without_inventing_a_result():

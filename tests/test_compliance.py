@@ -2,11 +2,23 @@ from datetime import date
 
 from services.compliance import (
     CANTON_RULES,
+    FSVO_BEES_URLS,
+    FSVO_STOCK_CONTROL_GUIDE_URLS,
+    FSVO_STOCK_CONTROL_TEMPLATE_URLS,
+    LAND_AGREEMENT_SOURCE_URLS,
     VETERINARY_DIRECTORY_URL,
     cantonal_rule,
     movement_steps,
     notification_copy,
 )
+
+
+def test_official_document_links_cover_only_verified_languages():
+    assert set(FSVO_BEES_URLS) == {"de", "fr", "it"}
+    assert set(FSVO_STOCK_CONTROL_TEMPLATE_URLS) == {"de", "fr", "it"}
+    assert set(FSVO_STOCK_CONTROL_GUIDE_URLS) == {"de", "fr", "it"}
+    assert set(LAND_AGREEMENT_SOURCE_URLS) == {"de", "fr"}
+    assert all(url.startswith("https://") for url in FSVO_BEES_URLS.values())
 
 
 def test_current_cantonal_veterinary_directory_is_used():
@@ -72,6 +84,7 @@ def test_notice_uses_canton_language_without_repeating_canton():
     _subject, french = notification_copy(data, "VD")
     assert "Je vous prie de vérifier" in french
     assert "non une autorisation" in french
+    assert "25/09/2026" in french
     assert "Bern (BE) (BE)" not in french
 
     _subject, italian = notification_copy(data, "TI")

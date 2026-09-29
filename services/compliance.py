@@ -15,21 +15,29 @@ from __future__ import annotations
 # The BLV now links to the maintained directory of the Association of Swiss
 # Cantonal Veterinarians instead of the former static BLV PDF.
 VETERINARY_DIRECTORY_URL = "https://www.kantonstieraerzte.ch/uber-uns.html"
-FSVO_BEES_URL = "https://www.blv.admin.ch/de/bienen"
+FSVO_BEES_URLS = {
+    "de": "https://www.blv.admin.ch/de/bienen",
+    "fr": "https://www.blv.admin.ch/fr/abeilles",
+    "it": "https://www.blv.admin.ch/it/api",
+}
+FSVO_BEES_URL = FSVO_BEES_URLS["de"]
 FSVO_STOCK_CONTROL_TEMPLATE_URLS = {
     "de": "https://www.blv.admin.ch/dam/de/sd-web/keeNTCMwOYVC/vorlage-bestandeskontrolle-bienenvoelker-de.docx",
     "fr": "https://www.blv.admin.ch/dam/fr/sd-web/keeNTCMwOYVC/vorlage-bestandeskontrolle-bienenvoelker-fr.docx",
     "it": "https://www.blv.admin.ch/dam/it/sd-web/keeNTCMwOYVC/vorlage-bestandeskontrolle-bienenvoelker-it.docx",
 }
 FSVO_STOCK_CONTROL_TEMPLATE_URL = FSVO_STOCK_CONTROL_TEMPLATE_URLS["de"]
-FSVO_STOCK_CONTROL_GUIDE_URL = (
-    "https://www.blv.admin.ch/dam/de/sd-web/dQWh4Q6Qxpng/"
-    "anleitung-fuehren-bestandeskontrolle-bienen-de.pdf"
-)
-LAND_AGREEMENT_SOURCE_URL = (
-    "https://bienen.ch/wp-content/uploads/2022/11/"
-    "Mustervereinbarung_fuer_Platz_fuer_Bienenhaltung_Formular.pdf"
-)
+FSVO_STOCK_CONTROL_GUIDE_URLS = {
+    "de": "https://www.blv.admin.ch/dam/de/sd-web/dQWh4Q6Qxpng/anleitung-fuehren-bestandeskontrolle-bienen-de.pdf",
+    "fr": "https://www.blv.admin.ch/dam/fr/sd-web/dQWh4Q6Qxpng/anleitung-fuehren-bestandeskontrolle-bienen-fr.pdf",
+    "it": "https://www.blv.admin.ch/dam/it/sd-web/dQWh4Q6Qxpng/anleitung-fuehren-bestandeskontrolle-bienen-it.pdf",
+}
+FSVO_STOCK_CONTROL_GUIDE_URL = FSVO_STOCK_CONTROL_GUIDE_URLS["de"]
+LAND_AGREEMENT_SOURCE_URLS = {
+    "de": "https://bienen.ch/wp-content/uploads/2022/11/Mustervereinbarung_fuer_Platz_fuer_Bienenhaltung_Formular.pdf",
+    "fr": "https://abeilles.ch/wp-content/uploads/sites/7/2023/03/Modele_de_convention_entre_proprietaire_terrien_et_apiculteur_version_imprimable.pdf",
+}
+LAND_AGREEMENT_SOURCE_URL = LAND_AGREEMENT_SOURCE_URLS["de"]
 
 CHECKED_ON = "2026-09-28"
 FEDERAL_MOVE_RULE = (
@@ -245,7 +253,7 @@ def notification_copy(data: dict, canton: str) -> tuple[str, str]:
         "destination": destination,
         "destination_number": data["apiary_number"] or "-",
         "coordinates": data["coordinates"],
-        "date": data["move_date"].strftime("%d.%m.%Y"),
+        "date": data["move_date"].strftime("%d/%m/%Y"),
         "colonies": data["colonies"],
         "phone": data["phone"],
         "email": data["email"],
