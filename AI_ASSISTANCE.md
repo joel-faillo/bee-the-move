@@ -3,7 +3,7 @@
 ## Tool and purpose
 
 The team used **OpenAI Codex** as a programming aid between 21 and
-29 September 2026. Codex helped restructure an earlier Flask prototype as a
+30 September 2026. Codex helped restructure an earlier Flask prototype as a
 Streamlit application, draft and review Python code, prepare tests, improve
 documentation, and audit the interface and the official-source workflow.
 
@@ -28,6 +28,12 @@ The working conversation included instructions such as:
 > test every relevant function, and document AI use according to the course
 > requirements.
 
+> Add a logically ordered planning period for the beekeeper. Use short-term
+> forecasts for bee-flight context and historical phenology, mapped forage and
+> climate normals for the expected stay, without presenting historical data as
+> a forecast. Audit the result against real Swiss beekeeping practice and keep
+> regional screening separate from field verification and transport planning.
+
 ## Affected code
 
 Substantial AI-assisted drafting or revision appears in `app.py`,
@@ -50,7 +56,7 @@ The team remains responsible for:
 For an accompanying report or methods section, describe the use in prose and
 cite it as **(OpenAI, 2026)** where AI-assisted content is reproduced.
 
-> OpenAI. (2026). *Codex* (accessed 29 September 2026) [Large language model].
+> OpenAI. (2026). *Codex* (accessed 30 September 2026) [Large language model].
 > https://openai.com/codex/
 
 This record follows the course slides and the HSG “Writing with AI” guidance:

@@ -124,7 +124,7 @@ class LayerControl {{
     this.container.className='maplibregl-ctrl layers';
     this.container.innerHTML=`<button type="button" class="layer-toggle" aria-expanded="false">Map layers</button>
       <div class="layer-options" hidden>
-        <label><input type="checkbox" data-layer="candidates" checked> Recommended areas</label>
+        <label><input type="checkbox" data-layer="candidates" checked> Regional candidates</label>
         <label><input type="checkbox" data-layer="radius-line,radius-fill" checked> Search radius</label>
         <label><input type="checkbox" data-layer="phenology" checked> Phenology station</label>
         <label><input type="checkbox" data-layer="forage"> Agricultural parcels near searched place</label>
@@ -163,7 +163,7 @@ map.on('load',()=>{{
   map.addLayer({{id:'candidates',type:'circle',source:'candidates',paint:{{'circle-radius':['case',['get','selected'],9,7],'circle-color':['case',['get','selected'],'#f2b705','#2d8a52'],'circle-stroke-color':'#ffffff','circle-stroke-width':2}}}});
   map.addSource('origin',{{type:'geojson',data:data.origin}});
   map.addLayer({{id:'origin',type:'circle',source:'origin',paint:{{'circle-radius':7,'circle-color':'#111111','circle-stroke-color':'#ffffff','circle-stroke-width':2}}}});
-  for (const layer of ['origin','candidates','phenology','pollen','forage']) map.on('click',layer,e=>{{const p=e.features[0].properties; new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`<b>${{p.name}}</b>${{p.score?`<br>BeeScore ${{p.score}}/100`:''}}${{p.detail?`<br>${{p.detail}}`:''}}${{p.category?`<br>${{p.category}}`:''}}`).addTo(map)}});
+  for (const layer of ['origin','candidates','phenology','pollen','forage']) map.on('click',layer,e=>{{const p=e.features[0].properties; new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`<b>${{p.name}}</b>${{p.score?`<br>Regional index ${{p.score}}/100`:''}}${{p.detail?`<br>${{p.detail}}`:''}}${{p.category?`<br>${{p.category}}`:''}}`).addTo(map)}});
   // Add the control only after every layer exists, so its switches always
   // refer to a valid MapLibre layer.
   map.addControl(new LayerControl(),'top-left');

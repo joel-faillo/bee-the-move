@@ -1,4 +1,4 @@
-from services.geo import GeoAdminService
+from services.geo import GeoAdminService, wgs84_to_lv95
 
 
 class FakeHttp:
@@ -75,3 +75,9 @@ def test_canton_is_resolved_from_official_boundary_layer():
         "code": "SG",
         "name": "St. Gallen",
     }
+
+
+def test_wgs84_to_lv95_matches_st_gallen():
+    easting, northing = wgs84_to_lv95(47.4245, 9.3767)
+    assert abs(easting - 2_746_000) < 2_000
+    assert abs(northing - 1_254_000) < 2_000

@@ -20,7 +20,7 @@ class PollenService:
     """Read the nearest current MeteoSwiss pollen station.
 
     Pollen is map context only: airborne grains do not measure nectar supply,
-    so this service intentionally contributes no points to the BeeScore.
+    so this service intentionally contributes no regional-index points.
     """
 
     def __init__(self, http: HttpClient) -> None:

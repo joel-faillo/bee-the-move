@@ -120,6 +120,31 @@ def test_selected_autocomplete_coordinates_are_not_geocoded_again():
     }
 
 
+def test_searched_area_evidence_uses_the_exact_selected_coordinates():
+    class RecordingLandscape(StubLandscape):
+        def __init__(self):
+            self.coordinates = None
+
+        def analyse(self, lat, lon, *_args):
+            self.coordinates = lat, lon
+            return super().analyse(lat, lon, *_args)
+
+    landscape = RecordingLandscape()
+    analysis = BeeMoveAnalysis(
+        geo=StubGeo(),
+        forecast=StubForecast(),
+        phenology=StubPhenology(),
+        landscape=landscape,
+        pollen=StubPollen(),
+        routing=StubRouting(),
+    )
+    selected = {"label": "Exact place", "lat": 47.4, "lon": 9.3}
+
+    analysis.run(selected, 10)
+
+    assert landscape.coordinates == (47.4, 9.3)
+
+
 def test_selected_postcode_reaches_the_searched_destination():
     analysis = BeeMoveAnalysis(
         geo=StubGeo(),
@@ -138,9 +163,35 @@ def test_selected_postcode_reaches_the_searched_destination():
             "lon": 9.3767,
         },
         10,
+        colony_count=12,
     )
 
     assert result["results"][0]["postal_code"] == "9000"
+    assert result["colony_count"] == 12
+
+
+def test_missing_core_evidence_is_not_presented_as_a_comparable_score():
+    class MissingLandscape(StubLandscape):
+        def analyse(self, *_args):
+            return {
+                "available": False,
+                "score": 0,
+                "diversity_score": 0,
+                "top_resources": [],
+            }
+
+    analysis = BeeMoveAnalysis(
+        geo=StubGeo(),
+        forecast=StubForecast(),
+        phenology=StubPhenology(),
+        landscape=MissingLandscape(),
+        pollen=StubPollen(),
+        routing=StubRouting(),
+    )
+
+    candidate = analysis.run("St. Gallen", 10)["results"][0]
+    assert candidate["score"] is None
+    assert not candidate["ranking_ready"]
 
 
 def test_elevation_filter_is_explicit_and_bounded():
@@ -166,8 +217,114 @@ def test_no_forecast_candidate_produces_a_clear_error():
         routing=StubRouting(),
     )
 
-    with pytest.raises(ValueError, match="Nessuna località MeteoSwiss"):
+    with pytest.raises(ValueError, match="No MeteoSwiss location"):
         analysis.run("St. Gallen", 10)
+
+
+def test_weather_failure_keeps_historical_planning_available():
+    class UnavailableWeather(StubForecast):
+        def forecasts(self, _points):
+            raise ConnectionError("temporary outage")
+
+    analysis = BeeMoveAnalysis(
+        geo=StubGeo(),
+        forecast=UnavailableWeather(),
+        phenology=StubPhenology(),
+        landscape=StubLandscape(),
+        pollen=StubPollen(),
+        routing=StubRouting(),
+    )
+
+    result = analysis.run(
+        "St. Gallen",
+        10,
+        analysis_date="2027-04-01",
+        planning_end_date="2027-04-28",
+    )
+
+    assert result["sources"]["meteoswiss_forecast"] == {"available": False}
+    assert result["results"][0]["weather"]["days"] == []
+    assert result["results"][0]["flowering"]["available"]
+
+
+def test_selected_analysis_date_filters_the_available_forecast():
+    class NineDayForecast(StubForecast):
+        def forecasts(self, _points):
+            return {
+                self.point.key: [
+                    {
+                        "date": f"2026-09-{day:02d}",
+                        "flight_score": 70,
+                        "flight_hours": 8,
+                    }
+                    for day in range(18, 27)
+                ]
+            }, {"updated": "2026-09-18T10:00:00Z"}
+
+    analysis = BeeMoveAnalysis(
+        geo=StubGeo(),
+        forecast=NineDayForecast(),
+        phenology=StubPhenology(),
+        landscape=StubLandscape(),
+        pollen=StubPollen(),
+        routing=StubRouting(),
+    )
+
+    result = analysis.run("St. Gallen", 50, analysis_date="2026-09-22")
+
+    assert result["analysis_date"] == "2026-09-22"
+    assert result["forecast_window_end"] == "2026-09-26"
+    assert result["forecast_lead_days"] == 4
+    assert [day["date"] for day in result["results"][0]["weather"]["days"]] == [
+        "2026-09-22",
+        "2026-09-23",
+        "2026-09-24",
+        "2026-09-25",
+        "2026-09-26",
+    ]
+
+    future = analysis.run(
+        "St. Gallen",
+        50,
+        analysis_date="2026-09-27",
+        planning_end_date="2026-10-24",
+    )
+    assert future["forecast_lead_days"] is None
+    assert future["planning_days"] == 28
+    assert future["results"][0]["weather"]["days"] == []
+    assert not future["results"][0]["forecast_confirmed"]
+
+
+def test_planned_stay_drives_the_complete_flowering_signal():
+    class RecordingPhenology(StubPhenology):
+        def __init__(self):
+            self.dates = []
+
+        def flowering_forecast(self, _lat, _lon, dates):
+            self.dates = dates
+            return super().flowering_forecast(_lat, _lon, dates)
+
+    phenology = RecordingPhenology()
+    analysis = BeeMoveAnalysis(
+        geo=StubGeo(),
+        forecast=StubForecast(),
+        phenology=phenology,
+        landscape=StubLandscape(),
+        pollen=StubPollen(),
+        routing=StubRouting(),
+    )
+
+    result = analysis.run(
+        "St. Gallen",
+        10,
+        analysis_date="2026-09-18",
+        planning_end_date="2026-10-15",
+    )
+
+    assert len(phenology.dates) == 28
+    assert phenology.dates[0] == "2026-09-18"
+    assert phenology.dates[-1] == "2026-10-15"
+    assert len(result["results"][0]["flowering"]["daily"]) == 28
 
 
 def test_meteoswiss_height_is_used_only_when_geoadmin_height_is_unavailable():

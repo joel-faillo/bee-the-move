@@ -1,4 +1,5 @@
 from beescore import (
+    best_period,
     calculate,
     continuity_score,
     distance_score,
@@ -21,20 +22,32 @@ def test_weather_rewards_dry_mild_days():
     assert good > poor
 
 
-def test_distance_score_uses_selected_radius():
-    assert distance_score(0, 50) == 100
-    assert distance_score(50, 50) == 0
+def test_distance_score_uses_a_fixed_scale():
+    assert distance_score(0) == 100
+    assert distance_score(25) == 50
+    assert distance_score(50) == 0
 
 
 def test_beescore_is_weighted_and_bounded():
     result = calculate(forage=80, flight_weather=70, continuity=60, logistics=90)
-    assert result["score"] == 75
+    assert result["score"] == 77
     assert set(result["components"]) == {
         "forage",
         "flight_weather",
         "continuity",
         "logistics",
     }
+    assert result["forecast_confirmed"]
+
+
+def test_weather_is_context_and_does_not_change_regional_ranking():
+    with_weather = calculate(forage=80, flight_weather=10, continuity=60, logistics=90)
+    without_weather = calculate(forage=80, flight_weather=None, continuity=60, logistics=90)
+
+    assert with_weather["score"] == without_weather["score"] == 77
+    assert without_weather["components"]["flight_weather"] is None
+    assert not without_weather["forecast_confirmed"]
+    assert sum(without_weather["applied_weights"].values()) == pytest.approx(100)
 
 
 def test_forage_combines_current_bloom_and_mapped_resources():
@@ -47,6 +60,20 @@ def test_continuity_penalises_unstable_flowering():
         [{"score": value} for value in [10, 90, 10, 90, 10, 90, 10]], 60
     )
     assert stable > unstable
+
+
+def test_best_period_reports_the_available_window_length():
+    weather = [
+        {"date": f"2026-10-0{day}", "flight_score": score}
+        for day, score in ((1, 20), (2, 80), (3, 90), (4, 70))
+    ]
+    flowering = [{"date": day["date"], "score": 60} for day in weather]
+
+    assert best_period(weather, flowering) == {
+        "from": "2026-10-02",
+        "to": "2026-10-04",
+        "days": 3,
+    }
 
 
 def test_landscape_values_real_forage_above_cereals():

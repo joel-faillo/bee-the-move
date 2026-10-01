@@ -37,28 +37,50 @@ Without a key, the app clearly uses direct Haversine distance.
 1. Type a Swiss place or postcode. Nothing is preselected; the user must choose
    one official GeoAdmin suggestion. The autocomplete excludes canton and
    district centroids because they are too broad for an apiary location.
-2. Choose a direct geographic search radius from 2 to 50 km and, optionally, one mapped forage category
-   or elevation band. Elevation is an eligibility filter, not a hidden score
-   bonus.
-3. Compare the best areas. The searched area is always retained, even when it
-   is not among the top three, and is shown at 0 km.
-4. Inspect the map, four BeeScore components, seven-day forecast, flowering
-   estimate and elevation. Map switches show the search radius, recommended
-   areas, nearest phenology station, agricultural forage centroids and nearest
+2. Enter the planned arrival, the end of the period and the number of colonies.
+   Four weeks is only an editable starting point; the application does not claim
+   that every colony should remain for a standard duration. Also choose a direct
+   geographic search radius from 2 to 50 km and, optionally, one mapped forage
+   category or elevation band. Elevation is an eligibility filter, not a hidden
+   score bonus.
+3. The same planning period drives the historical flowering model and forage
+   continuity. Orchard, meadow and pasture preferences also focus the
+   phenology model on directly matching observed species. Other preferences
+   still rank real mapped agricultural area, while the interface explains that
+   no direct species match exists in the MeteoSwiss phenology dataset.
+4. Compare regional candidates. These are representative MeteoSwiss
+   place/postcode points, not approved parcels. The searched area is always
+   retained as a benchmark and is shown at 0 km.
+5. Inspect two decision horizons separately. Site suitability uses flowering
+   and mapped forage across the complete planned stay. Short-term bee-flight
+   conditions use up to seven available days from MeteoSwiss's current
+   nine-day forecast, but never change the regional ranking. Monthly
+   1991–2020 climate normals describe typical temperature, precipitation and
+   relative sunshine for the selected calendar period, and are labelled as
+   historical context rather than a forecast. Map switches show the search radius, recommended
+   candidates, nearest phenology station, agricultural forage centroids and nearest
    pollen station; the last two context layers start hidden to keep the map
    readable.
-5. Select a destination and enter the beekeeper, land, contract and movement
+6. If arrival lies beyond the live forecast, the regional index remains
+   comparable and the user is told to return within nine days of the move to
+   assess the first foraging days. Actual transport should be planned for a
+   suitable early-morning, evening or night period.
+7. Treat the selected result as a regional candidate. A field checklist covers
+   water, microclimate, access, safety distances, permission and current health
+   restrictions before paperwork begins.
+8. Select a destination and enter the beekeeper, land, contract and movement
    details in the same page. The recommended-area centre is only a reference:
    enter the exact apiary or parcel coordinates for the official form. GeoAdmin
    verifies that point and determines the competent destination canton.
-6. Enter dates in Swiss day/month/year order. Results, charts and source
-   timestamps use the same order. Open-ended agreements do not request or
-   insert a fixed-term end date.
-7. Download a prefilled copy of the original German BienenSchweiz sample site
+9. Enter dates in Swiss day/month/year order. The planned arrival date is
+   proposed as the movement date but remains editable. Results, charts and
+   source timestamps use the same order. Open-ended agreements do not request
+   or insert a fixed-term end date.
+10. Download a prefilled copy of the original German BienenSchweiz sample site
    agreement and the official German, French or Italian BLV stock-control form.
    Blank source links follow the selected BLV language where an official
    version exists.
-8. Review the official guidance for the detected origin and destination
+11. Review the official guidance for the detected origin and destination
    cantons. The app prepares a German, French or Italian email **requesting
    confirmation** of the procedure; it is not itself a notification or permit.
 
@@ -74,24 +96,33 @@ Personal and property details remain in the current Streamlit session for
 document generation. They are not written to the repository or sent to the
 public-data APIs used for the recommendation.
 
-## BeeScore
+Dates up to one year ahead can be planned. Historical observations and climate
+normals describe seasonal suitability, but the app never presents them as a
+weather forecast for a future date.
+
+## Regional suitability index
 
 | Component | Weight | Inputs |
 |---|---:|---|
-| Flowering and forage | 45% | ML flowering timing plus mapped agricultural resources |
-| Flight weather | 30% | Hourly temperature, rain, wind, gust and radiation |
-| Continuity | 15% | Seven-day flowering stability and forage diversity |
-| Logistics | 10% | Direct distance, or road distance to the nearest routable road when openrouteservice is configured |
+| Flowering and forage | 70% | ML flowering timing across the planned stay plus mapped agricultural resources |
+| Continuity | 20% | Flowering stability across the planned stay and forage diversity |
+| Logistics | 10% | Fixed 0–50 km practicality scale using direct distance, or road distance when openrouteservice is configured |
 
-Pollen is shown as context and does not add points. Elevation can exclude
+Short-term bee-flight weather is displayed separately and never changes the
+regional ranking. This keeps the same place comparable across planning dates.
+The search radius is a filter and cannot change an unchanged destination's
+logistics score. Pollen is shown as context and does not add points. Elevation can exclude
 candidates only when the user deliberately chooses a band; it never adds score
 points. Agricultural forage coefficients and normalisation thresholds are
 transparent prototype assumptions, not official agronomic thresholds. The
 pale-green map dots are agricultural-parcel centroids, not bees, pollen counts
 or flowering observations.
 
-If an optional scoring source fails, the interface marks the analysis as
-partial instead of silently presenting its zero-value fallback as complete.
+If flowering or agricultural evidence fails, the interface marks the result as
+partial and does not present a comparable regional index.
+Climate normals are context rather than a score component because MeteoSwiss
+does not publish an official threshold that turns monthly normals into apiary
+quality. This avoids presenting a project assumption as an official rule.
 
 ## Flowering model
 
@@ -117,6 +148,10 @@ python -m scripts.train_flowering_model
 ```
 
 The output estimates seasonal timing, not field-level flowering or nectar.
+The general signal is limited to phenological species with a documented nectar
+or pollen role; wind-pollinated birch and cocksfoot are not treated as forage.
+The validation is chronological rather than a fully independent spatial field
+trial, so the model must remain a prototype planning signal.
 
 ## Data sources and source documents
 
@@ -126,11 +161,14 @@ The output estimates seasonal timing, not field-level flowering or nectar.
 | [GeoAdmin Height](https://docs.geo.admin.ch/access-data/get-point-height.html) | Candidate elevation |
 | [GeoAdmin Identify](https://docs.geo.admin.ch/access-data/identify-features.html) | Origin and destination canton |
 | [MeteoSwiss Local Forecast](https://opendatadocs.meteoswiss.ch/e-forecast-data/e4-local-forecast-data) | Hourly inputs summarised daily; seven days shown from a source horizon of up to nine full days |
+| [MeteoSwiss Spatial Climate Normals](https://opendatadocs.meteoswiss.ch/c-climate-data/c7-spatial-climate-normals) | Typical monthly temperature, precipitation and relative sunshine for 1991–2020 on the 1 km grid |
 | [MeteoSwiss Phenology](https://opendatadocs.meteoswiss.ch/a-data-groundbased/a9-phenological-observations) | ML target and observational fallback |
 | [MeteoSwiss Pollen](https://opendatadocs.meteoswiss.ch/a-data-groundbased/a7-pollen-stations) | Regional context only |
 | [Swiss agricultural land use](https://opendata.swiss/en/dataset/landwirtschaftliche-nutzungsflachen-schweiz) | Annual agricultural parcels used by the app's explicit forage heuristic |
 | [swisstopo Vector Tiles](https://docs.geo.admin.ch/visualize-data/vector-tiles.html) | Official map |
 | [BLV bee guidance](https://www.blv.admin.ch/de/bienen) | Registration, identification and movement rules |
+| [BienenSchweiz site guidance](https://bienen.ch/wp-content/uploads/2023/04/4.9_standortwahl.pdf) | Water, microclimate, access, colony-count and field-verification guidance |
+| [BienenSchweiz moving guidance](https://bienen.ch/wp-content/uploads/2022/11/4.9.1_wandern_mit_bienen.pdf) | Planning checks, safety distances and transport timing |
 | [BLV stock-control template (German)](https://www.blv.admin.ch/dam/de/sd-web/keeNTCMwOYVC/vorlage-bestandeskontrolle-bienenvoelker-de.docx) | Original federal Word form, published 21 April 2026 |
 | [BLV stock-control template (French)](https://www.blv.admin.ch/dam/fr/sd-web/keeNTCMwOYVC/vorlage-bestandeskontrolle-bienenvoelker-fr.docx) | Original federal Word form, published 21 April 2026 |
 | [BLV stock-control template (Italian)](https://www.blv.admin.ch/dam/it/sd-web/keeNTCMwOYVC/vorlage-bestandeskontrolle-bienenvoelker-it.docx) | Original federal Word form, published 21 April 2026 |
@@ -158,6 +196,13 @@ an authorisation. No official Swiss Italian or English site-agreement template,
 and no official English BLV stock-control template, was found; the app does not
 invent either version.
 
+The climate normals are a stable official historical reference, not live
+measurements. To keep the deployed app responsive and reproducible, the three
+required MeteoSwiss NetCDF grids were reduced to the displayed 0.1-unit
+precision in `data/climate_normals_1991_2020.npz`. The snapshot was created on
+30 September 2026 from the STAC item updated on 30 June 2026. It contains only
+temperature, precipitation, relative sunshine and grid coordinates.
+
 The official HSG Declaration of Authorship supplied with the assignment is
 also included unchanged as `static/forms/hsg-declaration-of-authorship.pdf`.
 It is a submission document, not part of the beekeeper-facing workflow.
@@ -170,8 +215,10 @@ analysis.py                    source orchestration and candidate selection
 beescore.py                    pure score rules
 ml/flowering_model.py          model training, evaluation and inference
 model/flowering_model.joblib   included trained artifact
+data/climate_normals_1991_2020.npz  compact official grid snapshot
 services/geo.py                GeoAdmin search, height and canton
 services/meteoswiss.py         hourly local forecast
+services/climate_normals.py    historical 1991–2020 climate context
 services/phenology.py          observational flowering fallback
 services/pollen.py             optional context, never BeeScore
 services/landscape.py          mapped agricultural forage

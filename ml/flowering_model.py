@@ -33,6 +33,31 @@ ITEMS_URL = f"https://data.geo.admin.ch/api/stac/v1/collections/{COLLECTION}/ite
 STATIONS_URL = "https://data.geo.admin.ch/ch.meteoschweiz.ogd-phenology/ogd-phenology_meta_stations.csv"
 PARAMETERS_URL = "https://data.geo.admin.ch/ch.meteoschweiz.ogd-phenology/ogd-phenology_meta_parameters.csv"
 FEATURES = ["parameter", "latitude", "longitude", "height_m", "year"]
+FORAGE_PHENOLOGY_PARAMETERS = {
+    "Orchards and high-stem fruit trees": ("mmald65d", "mprua65d", "mpyrc65d"),
+    "Meadows": ("mcarp65d", "mleuv65d", "mtaro65d"),
+    "Pastures": ("mcarp65d", "mleuv65d", "mtaro65d"),
+}
+# MeteoSwiss observes phenological indicator plants, not nectar yield. The
+# regional signal therefore excludes wind-pollinated birch and cocksfoot and
+# keeps flowering species with a documented nectar or pollen role for bees.
+BEE_RELEVANT_PARAMETERS = (
+    "maesh65d",  # horse chestnut
+    "mcarp65d",  # cuckoo flower
+    "mcass65d",  # sweet chestnut
+    "mcora65d",  # hazel (early pollen)
+    "mepia65d",  # willow herb
+    "mleuv65d",  # field daisy
+    "mmald65d",  # apple
+    "mprua65d",  # cherry
+    "mpyrc65d",  # pear
+    "mrobp65d",  # robinia
+    "msora65d",  # rowan
+    "mtaro65d",  # dandelion
+    "mtilc65d",  # small-leaved lime
+    "mtilp65d",  # large-leaved lime
+    "mtusf65d",  # coltsfoot
+)
 
 
 @dataclass(frozen=True)
@@ -64,11 +89,25 @@ class FloweringModel:
         lon: float,
         height_m: float | None,
         dates: list[str],
+        preferred_category: str | None = None,
     ) -> dict:
-        """Predict flowering timing and convert it to a bounded daily signal."""
+        """Predict flowering timing across the user's complete planning period.
+
+        Only orchard, meadow and pasture filters have direct species matches in
+        the official phenology dataset. Other agricultural filters still use
+        their mapped area, while flowering remains the general regional signal.
+        """
         if not dates:
             return {"available": False, "daily": [], "score": 0}
-        year = date.fromisoformat(dates[0]).year
+        years = sorted({date.fromisoformat(value).year for value in dates})
+        selected_parameters = FORAGE_PHENOLOGY_PARAMETERS.get(preferred_category)
+        candidates = selected_parameters or BEE_RELEVANT_PARAMETERS
+        parameter_names = [
+            parameter
+            for parameter in candidates
+            if parameter in self.parameters
+        ]
+        focus_applied = bool(selected_parameters and parameter_names)
         frame = pd.DataFrame(
             [
                 {
@@ -78,7 +117,8 @@ class FloweringModel:
                     "height_m": height_m or 600.0,
                     "year": year,
                 }
-                for parameter in self.parameters
+                for year in years
+                for parameter in parameter_names
             ]
         )
         point_predictions = self.pipeline.predict(frame[FEATURES])
@@ -97,20 +137,33 @@ class FloweringModel:
                 lower_day=float(lower[index]),
                 upper_day=float(upper[index]),
             )
-            for index, parameter in enumerate(self.parameters)
+            for index, parameter in enumerate(frame["parameter"])
         ]
 
         daily = []
         for value in dates:
-            target = date.fromisoformat(value).timetuple().tm_yday
+            target_date = date.fromisoformat(value)
+            target = target_date.timetuple().tm_yday
             signals = sorted(
-                (math.exp(-abs(target - item.day_of_year) / 14) for item in predictions),
+                (
+                    math.exp(-abs(target - item.day_of_year) / 14)
+                    for item, prediction_year in zip(predictions, frame["year"])
+                    if prediction_year == target_date.year
+                ),
                 reverse=True,
             )[:6]
             daily.append({"date": value, "score": round(100 * sum(signals) / len(signals))})
 
-        midpoint = date.fromisoformat(dates[len(dates) // 2]).timetuple().tm_yday
-        closest = sorted(predictions, key=lambda item: abs(item.day_of_year - midpoint))[:5]
+        midpoint_date = date.fromisoformat(dates[len(dates) // 2])
+        midpoint = midpoint_date.timetuple().tm_yday
+        midpoint_predictions = [
+            item
+            for item, prediction_year in zip(predictions, frame["year"])
+            if prediction_year == midpoint_date.year
+        ]
+        closest = sorted(
+            midpoint_predictions, key=lambda item: abs(item.day_of_year - midpoint)
+        )[:5]
         return {
             "available": True,
             "daily": daily,
@@ -118,12 +171,24 @@ class FloweringModel:
             "predictions": [
                 {
                     "species": item.species,
-                    "predicted_date": _date_from_day(year, item.day_of_year),
-                    "range_from": _date_from_day(year, item.lower_day),
-                    "range_to": _date_from_day(year, item.upper_day),
+                    "predicted_date": _date_from_day(midpoint_date.year, item.day_of_year),
+                    "range_from": _date_from_day(midpoint_date.year, item.lower_day),
+                    "range_to": _date_from_day(midpoint_date.year, item.upper_day),
                 }
                 for item in closest
             ],
+            "preferred_category": preferred_category,
+            "category_focus_applied": focus_applied,
+            "category_focus_note": (
+                "Flowering timing uses matching orchard or grassland species."
+                if focus_applied
+                else (
+                    "This mapped forage category has no direct species match in the "
+                    "MeteoSwiss phenology dataset; the regional flowering signal is used."
+                    if preferred_category
+                    else "General regional flowering signal."
+                )
+            ),
             "model": "RandomForestRegressor",
             "model_mae_days": self.metrics.get("model_mae_days"),
             "baseline_mae_days": self.metrics.get("baseline_mae_days"),

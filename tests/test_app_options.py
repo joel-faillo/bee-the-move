@@ -97,6 +97,9 @@ def _complete_form(at, latitude=47.33, longitude=9.41):
 def test_initial_page_exposes_every_search_option_without_errors():
     at = AppTest.from_file("app.py", default_timeout=30).run()
     assert not at.exception
+    assert _by_label(at.date_input, "Planned arrival").value is not None
+    assert _by_label(at.date_input, "Evaluate the site until").value is not None
+    assert _by_label(at.number_input, "Colonies to move").value == 1
     assert _by_label(at.selectbox, "Maximum search radius").options == [
         f"{value} km" for value in RADIUS_OPTIONS
     ]
@@ -192,6 +195,17 @@ def test_every_form_selector_value_can_be_selected():
             assert not at.exception
 
 
+def test_later_arrival_keeps_the_planning_period_valid():
+    at = AppTest.from_file("app.py", default_timeout=30).run()
+
+    _by_label(at.date_input, "Planned arrival").set_value(date(2027, 3, 1)).run()
+
+    assert _by_label(at.date_input, "Evaluate the site until").value == date(
+        2027, 3, 28
+    )
+    assert not at.exception
+
+
 def test_location_autocomplete_formats_verified_choices_and_fails_closed():
     class Geo:
         def suggest(self, query):
@@ -257,7 +271,8 @@ def test_candidate_summary_distinguishes_road_and_direct_distance():
 
     assert "direct (Haversine)" in direct
     assert "nearest routable road: 12.4 km, 19 min" in routed
-    assert "Best relative period within the next seven days" in direct
+    assert "Best available initial foraging window" in direct
+    assert "55% flight weather" in direct
     assert "30/09/2026 to 02/10/2026" in direct
 
 
@@ -301,9 +316,30 @@ def test_coordinate_bounds_and_partial_evidence_messages_are_explicit():
         },
         {"sources": {"openrouteservice": {"configured": True}}},
     )
-    assert len(missing) == 4
+    assert len(missing) == 5
     assert any("flowering" in message for message in missing)
+    assert not any("weather" in message for message in missing)
+    assert any("climate normals" in message for message in missing)
     assert any("road route" in message for message in missing)
+
+    forecast_missing = _missing_evidence(
+        {
+            "flowering": {"available": True},
+            "weather": {"days": []},
+            "landscape": {"available": True},
+            "climate_normals": {"available": True},
+            "height_m": 500,
+            "is_origin_area": True,
+            "route": None,
+        },
+        {
+            "forecast_lead_days": 2,
+            "sources": {"openrouteservice": {"configured": False}},
+        },
+    )
+    assert forecast_missing == [
+        "weather was unavailable inside the current forecast horizon"
+    ]
 
 
 def test_move_form_validation_catches_dependent_fields_and_date_order():

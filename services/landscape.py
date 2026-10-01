@@ -46,22 +46,19 @@ class LandscapeService:
         preferred_category: str | None = None,
     ) -> dict:
         features, number_matched = self._features(lat, lon)
-        years = [item.get("properties", {}).get("bezugsjahr") for item in features]
-        current_year = max(
-            (year for year in years if isinstance(year, int)), default=None
-        )
+        reference_years = _reference_years(features)
         resources = defaultdict(float)
         weighted_square_metres = mapped_square_metres = 0.0
         categories = set()
+        valid_feature_count = 0
         for feature in features:
             props = feature.get("properties", {})
-            if current_year and props.get("bezugsjahr") != current_year:
-                continue
-            if props.get("ist_ueberlagernd"):
+            if not _is_active_feature(props):
                 continue
             area = _number(props.get("flaeche_m2"))
             if area <= 0:
                 continue
+            valid_feature_count += 1
             name = str(props.get("nutzung", "Sconosciuto"))
             value, category = _forage_value(name)
             x, y = _centroid(feature.get("geometry", {}).get("coordinates"))
@@ -93,7 +90,7 @@ class LandscapeService:
         )
         diversity = min(100, len(categories) * 20)
         return {
-            "available": True,
+            "available": valid_feature_count > 0,
             "score": round(0.8 * availability + 0.2 * diversity, 1),
             "diversity_score": round(diversity, 1),
             "mapped_hectares": round(mapped_square_metres / 10_000, 1),
@@ -106,8 +103,10 @@ class LandscapeService:
                     resources.items(), key=lambda item: item[1], reverse=True
                 )[:3]
             ],
-            "reference_year": current_year,
+            "reference_year": max(reference_years, default=None),
+            "reference_years": reference_years,
             "feature_count": len(features),
+            "valid_feature_count": valid_feature_count,
             "truncated": number_matched > len(features),
             "method": "superfici agricole ponderate per valore mellifero e distanza in anelli di 1, 2 e 3 km; il filtro opzionale concentra la componente risorse sulla categoria scelta",
         }
@@ -120,14 +119,10 @@ class LandscapeService:
         these are mapped crop locations, not reconstructed field boundaries.
         """
         features, _number_matched = self._features(lat, lon)
-        years = [item.get("properties", {}).get("bezugsjahr") for item in features]
-        current_year = max(
-            (year for year in years if isinstance(year, int)), default=None
-        )
         points = []
         for feature in features:
             props = feature.get("properties", {})
-            if current_year and props.get("bezugsjahr") != current_year:
+            if not _is_active_feature(props):
                 continue
             name = str(props.get("nutzung", ""))
             _value, category = _forage_value(name)
@@ -143,7 +138,7 @@ class LandscapeService:
                     "lon": round(point_lon, 6),
                     "category": category,
                     "name": name,
-                    "year": current_year,
+                    "year": props.get("bezugsjahr"),
                 }
             )
         return points
@@ -208,6 +203,33 @@ def _forage_value(name: str) -> tuple[float, str]:
     if any(term in value for term in LOW_VALUE):
         return 0.08, "Low-forage arable crops"
     return 0.25, "Other agricultural vegetation"
+
+
+def _reference_years(features: list[dict]) -> list[int]:
+    """Return every current reference year present in the mixed national feed."""
+    return sorted(
+        {
+            year
+            for feature in features
+            if isinstance((year := feature.get("properties", {}).get("bezugsjahr")), int)
+        }
+    )
+
+
+def _is_active_feature(props: dict) -> bool:
+    """Reject overlay and explicitly non-current parcel records.
+
+    The national feed already exposes each provider's current publication, but
+    reference years can differ inside one search window. Filtering on one
+    global year would therefore discard valid neighbouring records.
+    """
+    if props.get("ist_ueberlagernd") is True:
+        return False
+    if props.get("ist_definitiv") is False:
+        return False
+    if props.get("nutzung_im_beitragsjahr") is False:
+        return False
+    return True
 
 
 def _centroid(coordinates) -> tuple[float | None, float | None]:

@@ -17,3 +17,6 @@ class Config:
     FLOWERING_MODEL_PATH = os.getenv(
         "FLOWERING_MODEL_PATH", "model/flowering_model.joblib"
     )
+    CLIMATE_NORMALS_PATH = os.getenv(
+        "CLIMATE_NORMALS_PATH", "data/climate_normals_1991_2020.npz"
+    )

@@ -33,6 +33,28 @@ def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return radius * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
+def wgs84_to_lv95(latitude: float, longitude: float) -> tuple[float, float]:
+    """Convert WGS84 to LV95 with swisstopo's official approximation."""
+    lat = (latitude * 3600 - 169_028.66) / 10_000
+    lon = (longitude * 3600 - 26_782.5) / 10_000
+    easting = (
+        2_600_072.37
+        + 211_455.93 * lon
+        - 10_938.51 * lon * lat
+        - 0.36 * lon * lat**2
+        - 44.54 * lon**3
+    )
+    northing = (
+        1_200_147.07
+        + 308_807.95 * lat
+        + 3_745.25 * lon**2
+        + 76.63 * lat**2
+        - 194.56 * lon**2 * lat
+        + 119.79 * lat**3
+    )
+    return easting, northing
+
+
 class GeoAdminService:
     """Resolve Swiss places/CAPs and retrieve official point elevation."""
 

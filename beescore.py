@@ -1,7 +1,9 @@
-"""Pure, bounded and deliberately small BeeScore formula.
+"""Pure, bounded and deliberately small regional-suitability formula.
 
-Only four explainable components receive weight. Pollen and elevation remain
-visible context but never enter this calculation.
+The ranking describes the longer-term suitability of a regional candidate.
+Short-term flight weather stays visible, but does not make the same place look
+biologically better or worse depending on the day on which it is searched.
+Pollen and elevation also remain context rather than hidden score inputs.
 
 AI assistance: OpenAI Codex supported drafting and review. See
 ``AI_ASSISTANCE.md`` for scope, prompts and the full citation.
@@ -12,9 +14,8 @@ from __future__ import annotations
 from statistics import mean, pstdev
 
 WEIGHTS = {
-    "forage": 45.0,
-    "flight_weather": 30.0,
-    "continuity": 15.0,
+    "forage": 70.0,
+    "continuity": 20.0,
     "logistics": 10.0,
 }
 
@@ -46,10 +47,10 @@ def forage_score(flowering: float, landscape: float) -> float:
 
 
 def continuity_score(flowering_days: list[dict], diversity: float) -> float:
-    """Reward a stable seven-day signal and multiple forage categories."""
+    """Reward a stable signal across the stay and multiple forage categories."""
     values = [
         float(day["score"])
-        for day in flowering_days[:7]
+        for day in flowering_days
         if day.get("score") is not None
     ]
     if not values:
@@ -58,26 +59,42 @@ def continuity_score(flowering_days: list[dict], diversity: float) -> float:
     return round(0.7 * stable + 0.3 * diversity, 1)
 
 
-def distance_score(distance_km: float, radius_km: float) -> float:
-    """Logistics only: this does not describe biological site quality."""
-    return round(max(0, 100 * (1 - distance_km / max(radius_km, 1))), 1)
+def distance_score(distance_km: float) -> float:
+    """Fixed logistics scale: 100 at the origin and zero from 50 km.
+
+    The search radius deliberately does not enter this calculation. Changing a
+    filter must not change the score of an otherwise identical destination.
+    """
+    return round(max(0, 100 - 2 * max(0, distance_km)), 1)
 
 
 def calculate(
-    forage: float, flight_weather: float, continuity: float, logistics: float
+    forage: float,
+    flight_weather: float | None,
+    continuity: float,
+    logistics: float,
 ) -> dict:
-    components = {
-        "forage": _bounded(forage),
-        "flight_weather": _bounded(flight_weather),
-        "continuity": _bounded(continuity),
-        "logistics": _bounded(logistics),
+    ranking_components = {
+        "forage": forage,
+        "continuity": continuity,
+        "logistics": logistics,
     }
-    total = sum(components[name] * weight for name, weight in WEIGHTS.items()) / sum(
-        WEIGHTS.values()
-    )
+    available = {name: _bounded(value) for name, value in ranking_components.items()}
+    total = sum(available[name] * WEIGHTS[name] for name in WEIGHTS) / 100
     return {
         "score": int(total + 0.5),
-        "components": {name: round(value, 1) for name, value in components.items()},
+        "components": {
+            "forage": round(available["forage"], 1),
+            "flight_weather": (
+                round(_bounded(flight_weather), 1)
+                if flight_weather is not None
+                else None
+            ),
+            "continuity": round(available["continuity"], 1),
+            "logistics": round(available["logistics"], 1),
+        },
+        "applied_weights": WEIGHTS.copy(),
+        "forecast_confirmed": flight_weather is not None,
     }
 
 
@@ -99,7 +116,11 @@ def best_period(weather_days: list[dict], flowering_days: list[dict]) -> dict | 
     ]
     start = max(windows, key=lambda item: item[1])[0]
     end = min(start + 2, len(daily) - 1)
-    return {"from": daily[start][0], "to": daily[end][0]}
+    return {
+        "from": daily[start][0],
+        "to": daily[end][0],
+        "days": end - start + 1,
+    }
 
 
 def _bounded(value: float) -> float:
