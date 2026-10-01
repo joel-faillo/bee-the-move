@@ -15,7 +15,6 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 import streamlit as st
-import streamlit.components.v1 as components
 from dotenv import load_dotenv
 from streamlit_searchbox import st_searchbox
 
@@ -126,7 +125,7 @@ def _header() -> None:
         st.title("Bee the Move")
         st.markdown(
             '<p class="hero-copy">Find a promising area, understand the evidence, '
-            "and prepare the same hive move without leaving the page.</p>",
+            "and prepare the move without leaving the page.</p>",
             unsafe_allow_html=True,
         )
 
@@ -204,7 +203,10 @@ def _search(analysis: BeeMoveAnalysis) -> None:
                 "the BienenSchweiz recommendation of normally no more than 10–15 colonies per site."
             ),
         )
-        st.caption("Needed to judge whether the site still requires a capacity check.")
+        st.caption(
+            "Used for planning and the movement record. Local carrying capacity "
+            "must still be checked on site."
+        )
     if colony_count > 15:
         st.warning(
             "BienenSchweiz normally recommends no more than 10–15 colonies per site. "
@@ -297,7 +299,7 @@ def _results(result: dict) -> dict:
             "historical flowering, mapped forage and climate normals; they are not a weather forecast."
         )
     else:
-        lead_label = "today" if lead_days == 0 else f"{lead_days} days ahead"
+        lead_label = _forecast_lead_label(lead_days)
         st.caption(
             f"MeteoSwiss forecast lead: {lead_label}. Forecast uncertainty generally "
             "increases with lead time; Bee the Move does not invent a confidence percentage."
@@ -329,7 +331,7 @@ def _results(result: dict) -> dict:
 
     map_column, detail_column = st.columns([1.65, 1])
     with map_column:
-        components.html(map_html(result, selected["name"]), height=540)
+        st.iframe(map_html(result, selected["name"]), height=540)
         st.caption(
             "Map controls switch each evidence layer on or off. Small pale-green dots are centroids of mapped "
             "agricultural parcels near the searched place; they are not flowering observations."
@@ -391,8 +393,10 @@ def _results(result: dict) -> dict:
             st.caption("No forecast series available.")
     with right:
         st.markdown("**Modelled flowering signal across the planned stay**")
-        if not flowering.empty:
+        if not flowering.empty and flowering["score"].gt(0).any():
             st.line_chart(flowering.set_index("date")[["score"]], y_label="score")
+        elif not flowering.empty:
+            st.caption("No meaningful flowering signal is modelled for this period.")
         else:
             st.caption("No flowering series available.")
 
@@ -504,7 +508,7 @@ def _move_preparation(analysis: BeeMoveAnalysis, result: dict, destination: dict
     st.divider()
     st.header("Prepare this hive move")
     st.write(
-        f"Selected destination: **{destination['name']}**. Complete the guided fields once; "
+        f"Selected destination: **{destination['name']}.** Complete the guided fields once; "
         "Bee the Move inserts them into copies of the original source documents."
     )
     st.caption(
@@ -1052,16 +1056,26 @@ def _candidate_summary(candidate: dict) -> str:
         else ""
     )
     if period:
-        timing = (
-            "Best available initial foraging window (55% flight weather, 45% flowering signal): "
-            f"{dates}."
+        label = (
+            "Least unfavourable short-term window in the available forecast"
+            if flowering_score is not None and flowering_score < 25
+            else "Best modelled short-term foraging window in the available forecast"
         )
+        timing = f"{label} (55% flight weather, 45% flowering signal): {dates}."
     else:
         timing = (
             "Short-term bee-flight weather is not yet available; return within nine days of arrival "
             "to assess the first foraging days. Plan the actual transport for a suitable early-morning, evening or night period."
         )
     return f"{timing} {distance}.{low_signal}"
+
+
+def _forecast_lead_label(lead_days: int) -> str:
+    """Describe forecast lead time with correct singular and plural wording."""
+    if lead_days == 0:
+        return "today"
+    unit = "day" if lead_days == 1 else "days"
+    return f"{lead_days} {unit} ahead"
 
 
 def _missing_evidence(candidate: dict, result: dict) -> list[str]:

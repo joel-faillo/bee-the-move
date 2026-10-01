@@ -7,6 +7,7 @@ from app import (
     FORAGE_OPTIONS,
     RADIUS_OPTIONS,
     _candidate_summary,
+    _forecast_lead_label,
     _format_display_date,
     _location_suggestions,
     _missing_evidence,
@@ -271,7 +272,7 @@ def test_candidate_summary_distinguishes_road_and_direct_distance():
 
     assert "direct (Haversine)" in direct
     assert "nearest routable road: 12.4 km, 19 min" in routed
-    assert "Best available initial foraging window" in direct
+    assert "Best modelled short-term foraging window" in direct
     assert "55% flight weather" in direct
     assert "30/09/2026 to 02/10/2026" in direct
 
@@ -284,7 +285,14 @@ def test_candidate_summary_warns_when_flowering_signal_is_low():
             "route": None,
         }
     )
+    assert "Least unfavourable short-term window" in summary
     assert "Flowering signal remains low" in summary
+
+
+def test_forecast_lead_label_uses_correct_singular_and_plural():
+    assert _forecast_lead_label(0) == "today"
+    assert _forecast_lead_label(1) == "1 day ahead"
+    assert _forecast_lead_label(2) == "2 days ahead"
 
 
 def test_source_timestamp_is_compact_and_explicitly_utc():
