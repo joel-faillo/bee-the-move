@@ -407,6 +407,13 @@ def test_exact_coordinates_drive_canton_and_language_then_generate_documents():
     assert at.session_state["prepared_documents"]["data"]["destination_canton"] == "TI"
 
 
+def test_document_form_is_grouped_in_one_clear_section():
+    at = AppTest.from_function(_form_app, default_timeout=30).run()
+    assert any(
+        expander.label == "Prepare official documents" for expander in at.expander
+    )
+
+
 def test_editing_a_field_invalidates_prepared_documents():
     at = _complete_form(AppTest.from_function(_form_app, default_timeout=30).run())
     _by_label(at.button, "Prepare documents").click().run()

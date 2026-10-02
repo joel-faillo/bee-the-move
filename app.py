@@ -248,6 +248,7 @@ def _search(analysis: BeeMoveAnalysis) -> None:
             st.session_state["analysis_result"] = result
             st.session_state["selected_destination"] = result["results"][0]["name"]
             st.session_state.pop("prepared_documents", None)
+            st.session_state.pop("document_form_error", None)
             st.rerun()
         except ValueError as exc:
             st.error(str(exc))
@@ -327,6 +328,7 @@ def _results(result: dict) -> dict:
     selected = candidates[labels.index(chosen)]
     if selected["name"] != current:
         st.session_state.pop("prepared_documents", None)
+        st.session_state.pop("document_form_error", None)
     st.session_state["selected_destination"] = selected["name"]
 
     map_column, detail_column = st.columns([1.65, 1])
@@ -506,6 +508,18 @@ def _site_verification(result: dict, destination: dict) -> None:
 
 def _move_preparation(analysis: BeeMoveAnalysis, result: dict, destination: dict) -> None:
     st.divider()
+    keep_open = bool(
+        st.session_state.get("prepared_documents")
+        or st.session_state.get("document_form_error")
+    )
+    with st.expander("Prepare official documents", expanded=keep_open):
+        _move_preparation_content(analysis, result, destination)
+
+
+def _move_preparation_content(
+    analysis: BeeMoveAnalysis, result: dict, destination: dict
+) -> None:
+    """Render the guided form inside the single document-preparation section."""
     st.header("Prepare this hive move")
     st.write(
         f"Selected destination: **{destination['name']}.** Complete the guided fields once; "
@@ -793,8 +807,10 @@ def _move_preparation(analysis: BeeMoveAnalysis, result: dict, destination: dict
     if submitted:
         validation_error = validate_move_form(form_state, exact_destination_canton)
         if validation_error:
+            st.session_state["document_form_error"] = True
             st.error(validation_error)
         else:
+            st.session_state.pop("document_form_error", None)
             data = build_document_data(
                 form_state,
                 origin_name=result["origin"]["name"],
