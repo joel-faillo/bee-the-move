@@ -8,6 +8,28 @@ documents.
 The recommendation is decision support. It is not an official flowering
 forecast, health clearance, land permission or guarantee of nectar.
 
+## What the application does — and why
+
+Bee the Move deliberately stops at **regional screening**. It combines public
+Swiss data to create a shortlist, shows the evidence behind every result and
+then guides the beekeeper through the field, legal and document checks that
+cannot be automated honestly. A candidate is therefore a promising area to
+inspect, never an automatically approved apiary site.
+
+The current design separates three decisions that use different evidence:
+
+1. **Where:** a biological regional index compares modelled flowering, mapped
+   agricultural forage and continuity over the complete planned stay.
+2. **When:** the live MeteoSwiss forecast identifies short-term bee-flight
+   conditions and a possible three-day movement window.
+3. **Whether the exact parcel is usable:** the field checklist, exact
+   coordinates, owner agreement and cantonal procedure remain explicit human
+   checks.
+
+This separation is intentional. Combining all available numbers into one score
+would make changing weather, driving convenience or a nearby monitoring station
+look like biological qualities of the land.
+
 ## Start locally
 
 Python 3.11 or newer is required; the project is tested with Python 3.14.6.
@@ -57,10 +79,10 @@ Without a key, the app clearly uses direct Haversine distance.
    nine-day forecast, but never change the regional ranking. Monthly
    1991–2020 climate normals describe typical temperature, precipitation and
    relative sunshine for the selected calendar period, and are labelled as
-   historical context rather than a forecast. Map switches show the search radius, recommended
-   candidates, nearest phenology station, agricultural forage centroids and nearest
-   pollen station; the last two context layers start hidden to keep the map
-   readable.
+   historical context rather than a forecast. Map switches show the search
+   radius, recommended candidates, nearest phenology station, agricultural
+   forage centroids, FOEN–WSL habitat context and nearest pollen station. The
+   denser context layers start hidden to keep the map readable.
 6. If arrival lies beyond the live forecast, the regional index remains
    comparable and the user is told to return within nine days of the move to
    assess the first foraging days. Actual transport should be planned for a
@@ -104,25 +126,80 @@ weather forecast for a future date.
 
 | Component | Weight | Inputs |
 |---|---:|---|
-| Flowering and forage | 70% | ML flowering timing across the planned stay plus mapped agricultural resources |
-| Continuity | 20% | Flowering stability across the planned stay and forage diversity |
-| Logistics | 10% | Fixed 0–50 km practicality scale using direct distance, or road distance when openrouteservice is configured |
+| Flowering and mapped forage | 75% | 65% modelled flowering timing across the stay + 35% mapped agricultural-forage abundance |
+| Continuity | 25% | 70% stable flowering across the stay + 30% mapped forage-category diversity |
 
-Short-term bee-flight weather is displayed separately and never changes the
-regional ranking. This keeps the same place comparable across planning dates.
-The search radius is a filter and cannot change an unchanged destination's
-logistics score. Pollen is shown as context and does not add points. Elevation can exclude
-candidates only when the user deliberately chooses a band; it never adds score
-points. Agricultural forage coefficients and normalisation thresholds are
-transparent prototype assumptions, not official agronomic thresholds. The
-pale-green map dots are agricultural-parcel centroids, not bees, pollen counts
-or flowering observations.
+The resulting effective contributions are 48.75% flowering timing, 26.25%
+mapped agricultural forage, 17.5% flowering stability and 7.5% mapped category
+diversity. All inputs are bounded to 0–100 before weighting. A result is ranked
+only when both flowering and agricultural-land evidence are available; missing
+evidence is not silently replaced or reweighted.
+
+These weights are **project heuristics**, not official MeteoSwiss, FOEN or
+apicultural thresholds. Flowering receives the largest share because mapped
+land use alone does not show whether a resource is blooming during the planned
+stay. Continuity is kept separate so that one brief peak cannot dominate an
+otherwise weak period. The weights make the prototype understandable and
+testable; they have not been calibrated against measured colony productivity or
+honey yield.
+
+Short-term bee-flight weather and travel practicality are displayed separately
+and never change the biological regional ranking. This keeps the same place
+comparable across planning dates and avoids treating a shorter drive as better
+for the colony. The search radius is only a filter.
+
+| Evidence kept outside the index | Reason |
+|---|---|
+| Short-term weather | It changes daily and covers only the beginning of a longer stay. It is timing evidence, not permanent site quality. |
+| Direct or road distance | It affects transport practicality, not forage available to bees. |
+| Pollen monitoring | A nearby station measures airborne pollen for human-allergy monitoring; it is not a local nectar or bee-forage measurement. |
+| Elevation | It can be a user-selected eligibility filter, but the project has no validated universal elevation bonus for Swiss apiaries. |
+| Climate normals | They describe typical 1991–2020 monthly conditions, not the weather or flowering of the planned stay. |
+| FOEN–WSL Habitat Map | The public WMS is a visual classification layer; rendered colours do not provide bee-specific nectar values or candidate-area totals. |
+
+The agricultural source supplies parcel area and land-use labels, not nectar
+yield. Category coefficients, 1/2/3 km distance rings and saturation thresholds
+are documented prototype assumptions. Pale-green map dots are parcel centroids,
+not bees, pollen counts, flowering observations or reconstructed boundaries.
 
 If flowering or agricultural evidence fails, the interface marks the result as
 partial and does not present a comparable regional index.
 Climate normals are context rather than a score component because MeteoSwiss
 does not publish an official threshold that turns monthly normals into apiary
 quality. This avoids presenting a project assumption as an official rule.
+
+The “best period” is a separate three-day window inside the available live
+forecast. It combines 55% bee-flight weather and 45% modelled flowering to help
+time the move. It neither changes the regional index nor proves that conditions
+will remain suitable for the colony's complete stay.
+
+## Limits and correct interpretation
+
+- **Regional, not parcel-level:** candidate coordinates are representative
+  MeteoSwiss forecast points. Exact access, exposure, water, shade, spraying,
+  mowing, stocking pressure and safety distances require an on-site check.
+- **Flowering is modelled:** the machine-learning model estimates the timing of
+  MeteoSwiss 50% flowering observations. It does not measure current flowers,
+  nectar secretion, honey yield or colony demand at the destination.
+- **Agricultural land is a proxy:** the map does not cover every garden, urban
+  plant, forest resource or small wild-flower patch and does not say whether a
+  mapped crop is accessible, flowering or treated at the relevant moment.
+- **Forecast horizon is short:** the interface shows up to seven available days
+  from a MeteoSwiss source horizon of up to nine full days. Later parts of the
+  stay use seasonal flowering estimates and climate context, not invented daily
+  weather.
+- **Historical climate is not a forecast:** 1991–2020 normals support seasonal
+  interpretation but cannot describe the selected year's actual conditions.
+- **Monitoring stations are spatial proxies:** phenology and pollen stations may
+  be kilometres away and are labelled as references rather than field sensors.
+- **Legal and health status changes:** cantonal procedures and restriction zones
+  can change after deployment. The app links to the competent official source
+  and prepares a request for confirmation; it never claims clearance.
+- **No biological guarantee:** colony strength, diseases, competition from other
+  colonies and management decisions are outside the available public APIs.
+
+For these reasons, a high regional index means “worth inspecting first”, not
+“safe to move”, “officially authorised” or “guaranteed productive”.
 
 ## Flowering model
 
@@ -165,6 +242,7 @@ trial, so the model must remain a prototype planning signal.
 | [MeteoSwiss Phenology](https://opendatadocs.meteoswiss.ch/a-data-groundbased/a9-phenological-observations) | ML target and observational fallback |
 | [MeteoSwiss Pollen](https://opendatadocs.meteoswiss.ch/a-data-groundbased/a7-pollen-stations) | Regional context only |
 | [Swiss agricultural land use](https://opendata.swiss/en/dataset/landwirtschaftliche-nutzungsflachen-schweiz) | Annual agricultural parcels used by the app's explicit forage heuristic |
+| [FOEN–WSL Habitat Map v1.2](https://opendata.swiss/en/dataset/lebensraumkarte-der-schweiz) | Optional official habitat context on the map; no nectar or score is inferred |
 | [swisstopo Vector Tiles](https://docs.geo.admin.ch/visualize-data/vector-tiles.html) | Official map |
 | [BLV bee guidance](https://www.blv.admin.ch/de/bienen) | Registration, identification and movement rules |
 | [BienenSchweiz site guidance](https://bienen.ch/wp-content/uploads/2023/04/4.9_standortwahl.pdf) | Water, microclimate, access, colony-count and field-verification guidance |

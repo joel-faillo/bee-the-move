@@ -1,8 +1,10 @@
 """Agricultural forage context from the harmonised Swiss OGC API.
 
 Declared feature area is weighted by an explicit forage category and by
-distance in 1, 2 and 3 km rings. This is a prototype resource index, not an
-official nectar-yield prediction.
+distance in 1, 2 and 3 km rings. The source maps agricultural use, not nectar,
+flowering, pesticide exposure or bee access. Category values and normalisation
+thresholds are therefore transparent prototype assumptions, not official
+nectar-yield coefficients.
 
 AI assistance: OpenAI Codex supported drafting and review. See
 ``AI_ASSISTANCE.md`` for scope, prompts and the full citation.
@@ -78,7 +80,9 @@ class LandscapeService:
         selected_square_metres = resources.get(preferred_category, 0.0)
         # A chosen forage type becomes the abundance target. The lower
         # denominator reflects that one category naturally covers less area
-        # than the complete agricultural mosaic.
+        # than the complete agricultural mosaic. Both saturation thresholds
+        # are project heuristics: the public dataset provides area and land-use
+        # labels, but no official conversion from square metres to bee forage.
         availability = min(
             100,
             (

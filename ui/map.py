@@ -10,6 +10,11 @@ import json
 import math
 
 STYLE_URL = "https://vectortiles.geo.admin.ch/styles/ch.swisstopo.lightbasemap.vt/style.json"
+HABITAT_WMS = (
+    "https://wms.geo.admin.ch/?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap"
+    "&FORMAT=image/png&TRANSPARENT=true&LAYERS=ch.bafu.lebensraumkarte-schweiz"
+    "&CRS=EPSG:3857&STYLES=&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}"
+)
 
 
 def map_html(result: dict, selected_name: str | None = None) -> str:
@@ -127,6 +132,7 @@ class LayerControl {{
         <label><input type="checkbox" data-layer="candidates" checked> Regional candidates</label>
         <label><input type="checkbox" data-layer="radius-line,radius-fill" checked> Search radius</label>
         <label><input type="checkbox" data-layer="phenology" checked> Phenology station</label>
+        <label><input type="checkbox" data-layer="habitat-map"> FOEN–WSL habitat map (context)</label>
         <label><input type="checkbox" data-layer="forage"> Agricultural parcels near searched place</label>
         <label><input type="checkbox" data-layer="pollen"> Pollen station near searched place</label>
         <select id="forage-category"><option value="">All forage categories</option></select>
@@ -150,6 +156,12 @@ class LayerControl {{
   onRemove() {{this.container.remove(); this.map=undefined;}}
 }}
 map.on('load',()=>{{
+  // The official habitat WMS is useful for visual field interpretation, but a
+  // rendered tile is not a numerical nectar dataset. It publishes neither
+  // bee-specific forage values nor candidate-area totals, so deriving score
+  // from its colours would create false precision. Keep it optional and visual.
+  map.addSource('habitat-map',{{type:'raster',tiles:['{HABITAT_WMS}'],tileSize:256,attribution:'FOEN / WSL'}});
+  map.addLayer({{id:'habitat-map',type:'raster',source:'habitat-map',layout:{{visibility:'none'}},paint:{{'raster-opacity':0.55}}}});
   map.addSource('radius',{{type:'geojson',data:data.radius}});
   map.addLayer({{id:'radius-fill',type:'fill',source:'radius',paint:{{'fill-color':'#f2c230','fill-opacity':0.08}}}});
   map.addLayer({{id:'radius-line',type:'line',source:'radius',paint:{{'line-color':'#1b5e3a','line-width':2,'line-dasharray':[3,2]}}}});

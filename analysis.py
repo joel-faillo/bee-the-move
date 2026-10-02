@@ -31,7 +31,12 @@ from services.routing import RoutingService
 
 
 class BeeMoveAnalysis:
-    """Compare MeteoSwiss forecast points around a searched Swiss origin."""
+    """Compare representative regions around a searched Swiss origin.
+
+    Candidate coordinates come from MeteoSwiss forecast points. They are useful
+    common reference locations for public data, but they are not apiary parcels,
+    access permissions or field inspections.
+    """
 
     def __init__(
         self,
@@ -65,7 +70,13 @@ class BeeMoveAnalysis:
         planning_end_date: str | None = None,
         colony_count: int = 1,
     ) -> dict:
-        """Run the analysis and always retain the searched origin area."""
+        """Build a regional shortlist and always retain the searched area.
+
+        A comparable index is returned only when both flowering evidence and
+        mapped agricultural-land evidence are available. Optional-source errors
+        are exposed as missing context instead of being replaced by invented
+        values.
+        """
         # The autocomplete already resolves one exact GeoAdmin result. Reuse
         # those coordinates so an ambiguous label is not searched and ranked
         # a second time (for example Lausanne versus Belmont-sur-Lausanne).
@@ -208,6 +219,9 @@ class BeeMoveAnalysis:
             ranking_ready = bool(
                 flowering.get("available") and landscape.get("available")
             )
+            # Both biological evidence families are required. Renormalising a
+            # one-source result would make an incomplete region look comparable
+            # with fully evidenced candidates.
             if not ranking_ready:
                 score["score"] = None
             climate = (
@@ -260,6 +274,9 @@ class BeeMoveAnalysis:
 
         candidates.sort(key=_ranking_key, reverse=True)
         if self.routing.enabled:
+            # Road distance replaces the visible logistics estimate only. It
+            # must not reorder biological suitability; access still needs a
+            # parcel-level check by the beekeeper.
             route_targets = [
                 candidate
                 for candidate in candidates
@@ -278,16 +295,6 @@ class BeeMoveAnalysis:
                     candidate["components"]["logistics"] = distance_score(
                         route["distance_km"]
                     )
-                    candidate.update(
-                        calculate(
-                            candidate["components"]["forage"],
-                            candidate["components"]["flight_weather"],
-                            candidate["components"]["continuity"],
-                            candidate["components"]["logistics"],
-                        )
-                    )
-                    if not candidate["ranking_ready"]:
-                        candidate["score"] = None
             candidates.sort(key=_ranking_key, reverse=True)
 
         # Elevation is an eligibility preference, not a hidden score bonus.
@@ -328,10 +335,10 @@ class BeeMoveAnalysis:
             "phenology_station": phenology_station,
             "forage_map": forage_map,
             "score_method": {
-                "forage": 70,
+                "forage": 75,
                 "flight_weather": 0,
-                "continuity": 20,
-                "logistics": 10,
+                "continuity": 25,
+                "logistics": 0,
             },
             "sources": {
                 "geoadmin_search": True,
@@ -349,6 +356,7 @@ class BeeMoveAnalysis:
                 "trained_flowering_model": self.flowering_model is not None,
                 "meteoswiss_pollen": pollen.get("available", False),
                 "agricultural_land_use": landscape_available,
+                "foen_habitat_map": True,
                 "swisstopo_vector_tiles": True,
                 "openrouteservice": {
                     "configured": self.routing.enabled,

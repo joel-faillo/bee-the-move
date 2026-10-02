@@ -36,11 +36,13 @@ def test_map_explains_and_controls_context_layers():
     assert "Phenology station" in html
     assert "Agricultural parcels near searched place" in html
     assert "Pollen station near searched place" in html
+    assert "FOEN–WSL habitat map (context)" in html
+    assert "ch.bafu.lebensraumkarte-schweiz" in html
     assert "maplibre-gl@5.24.0" in html
     assert "All forage categories" in html
     for category in FORAGE_CATEGORIES:
         assert category in html
-    for layer in ("radius-line,radius-fill", "candidates", "phenology", "pollen", "forage"):
+    for layer in ("radius-line,radius-fill", "candidates", "phenology", "habitat-map", "pollen", "forage"):
         assert f'data-layer="{layer}"' in html
     assert 'class="layer-options" hidden' in html
     assert 'aria-expanded="false"' in html

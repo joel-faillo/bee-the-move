@@ -336,7 +336,8 @@ def _results(result: dict) -> dict:
         st.iframe(map_html(result, selected["name"]), height=540)
         st.caption(
             "Map controls switch each evidence layer on or off. Small pale-green dots are centroids of mapped "
-            "agricultural parcels near the searched place; they are not flowering observations."
+            "agricultural parcels near the searched place; they are not flowering observations. The official "
+            "FOEN–WSL habitat layer is visual context and does not add score."
         )
     with detail_column:
         st.subheader(selected["name"])
@@ -358,15 +359,15 @@ def _results(result: dict) -> dict:
             distance_label, distance_value = "Direct distance", f"{selected['distance_km']:.1f} km"
         b.metric(distance_label, distance_value)
         st.caption(
-            "The regional index always uses forage 70%, continuity 20% and logistics 10%. "
-            "Short-term weather is shown separately and never changes the underlying site ranking."
+            "The regional index uses flowering and mapped forage 75% and continuity 25%. "
+            "Travel and short-term weather are shown separately and never change biological site potential."
         )
         st.caption("The searched area stays visible as a benchmark even when it is not among the three highest regional indices.")
         for key, title in (
             ("forage", "Flowering & mapped forage during the stay"),
             ("flight_weather", "Short-term bee-flight conditions (not ranked)"),
             ("continuity", "Forage continuity during the stay"),
-            ("logistics", "Travel practicality"),
+            ("logistics", "Travel practicality (not ranked)"),
         ):
             value = selected["components"][key]
             if value is None:
@@ -959,10 +960,10 @@ def _method_and_sources(analysis: BeeMoveAnalysis) -> None:
     st.divider()
     with st.expander("Method, limitations and official sources"):
         st.markdown(
-            "**Regional suitability index:** flowering and mapped forage during the stay 70% · "
-            "stay continuity 20% · logistics 10%. Short-term bee-flight weather is displayed "
-            "separately, so a changing forecast cannot change the underlying site ranking. "
-            "Climate normals, pollen and elevation remain context rather than extra points."
+            "**Regional suitability index:** flowering and mapped forage during the stay 75% · "
+            "stay continuity 25%. Travel practicality and short-term bee-flight weather are "
+            "displayed separately, so neither can change biological site potential. The FOEN–WSL "
+            "habitat map, climate normals, pollen and elevation remain explicit context rather than hidden points."
         )
         if analysis.flowering_model:
             metrics = analysis.flowering_model.metrics
@@ -979,6 +980,7 @@ def _method_and_sources(analysis: BeeMoveAnalysis) -> None:
             ("MeteoSwiss Phenology", "ML training observations", "https://opendatadocs.meteoswiss.ch/a-data-groundbased/a9-phenological-observations"),
             ("MeteoSwiss Pollen", "Regional context only", "https://opendatadocs.meteoswiss.ch/a-data-groundbased/a7-pollen-stations"),
             ("Agricultural land use", "Annual parcels used by the app's forage heuristic", "https://opendata.swiss/en/dataset/landwirtschaftliche-nutzungsflachen-schweiz"),
+            ("FOEN–WSL Habitat Map v1.2", "Official habitat context on the map; not converted into nectar or score", "https://opendata.swiss/en/dataset/lebensraumkarte-der-schweiz"),
             ("swisstopo Vector Tiles", "Official map", "https://docs.geo.admin.ch/visualize-data/vector-tiles.html"),
             (
                 "BLV",

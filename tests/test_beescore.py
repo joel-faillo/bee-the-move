@@ -30,7 +30,7 @@ def test_distance_score_uses_a_fixed_scale():
 
 def test_beescore_is_weighted_and_bounded():
     result = calculate(forage=80, flight_weather=70, continuity=60, logistics=90)
-    assert result["score"] == 77
+    assert result["score"] == 75
     assert set(result["components"]) == {
         "forage",
         "flight_weather",
@@ -44,10 +44,19 @@ def test_weather_is_context_and_does_not_change_regional_ranking():
     with_weather = calculate(forage=80, flight_weather=10, continuity=60, logistics=90)
     without_weather = calculate(forage=80, flight_weather=None, continuity=60, logistics=90)
 
-    assert with_weather["score"] == without_weather["score"] == 77
+    assert with_weather["score"] == without_weather["score"] == 75
     assert without_weather["components"]["flight_weather"] is None
     assert not without_weather["forecast_confirmed"]
     assert sum(without_weather["applied_weights"].values()) == pytest.approx(100)
+
+
+def test_logistics_is_visible_but_does_not_change_biological_ranking():
+    near = calculate(forage=70, flight_weather=80, continuity=60, logistics=100)
+    far = calculate(forage=70, flight_weather=80, continuity=60, logistics=0)
+
+    assert near["score"] == far["score"]
+    assert near["components"]["logistics"] == 100
+    assert far["components"]["logistics"] == 0
 
 
 def test_forage_combines_current_bloom_and_mapped_resources():

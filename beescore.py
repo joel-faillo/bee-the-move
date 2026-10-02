@@ -1,9 +1,13 @@
-"""Pure, bounded and deliberately small regional-suitability formula.
+"""Pure, bounded and deliberately small regional-screening formula.
 
-The ranking describes the longer-term suitability of a regional candidate.
-Short-term flight weather stays visible, but does not make the same place look
-biologically better or worse depending on the day on which it is searched.
-Pollen and elevation also remain context rather than hidden score inputs.
+The index answers one narrow question: which candidate region has the strongest
+*modelled* combination of flowering, mapped agricultural forage and continuity
+during the planned stay? It does not approve a parcel or predict honey yield.
+
+Travel practicality and short-term flight weather stay visible, but neither can
+make the same landscape look biologically better or worse. Pollen, elevation,
+climate normals and map-only habitat context also remain outside the score
+because the available sources do not justify converting them into extra points.
 
 AI assistance: OpenAI Codex supported drafting and review. See
 ``AI_ASSISTANCE.md`` for scope, prompts and the full citation.
@@ -14,14 +18,20 @@ from __future__ import annotations
 from statistics import mean, pstdev
 
 WEIGHTS = {
-    "forage": 70.0,
-    "continuity": 20.0,
-    "logistics": 10.0,
+    # These are transparent project choices, not official MeteoSwiss or
+    # apicultural thresholds. Resource availability receives most weight;
+    # continuity prevents a brief flowering peak from dominating the ranking.
+    "forage": 75.0,
+    "continuity": 25.0,
 }
 
 
 def weather_score(days: list[dict]) -> float:
-    """Average forecast flight suitability, not the entire calendar day."""
+    """Summarise up to seven forecast days as operational flight context.
+
+    This is deliberately excluded from the regional index: forecasts change
+    every day and cannot describe the longer-term quality of a landscape.
+    """
     scores = [
         day["flight_score"] for day in days[:7] if day.get("flight_score") is not None
     ]
@@ -42,12 +52,22 @@ def weather_score(days: list[dict]) -> float:
 
 
 def forage_score(flowering: float, landscape: float) -> float:
-    """Combine time-sensitive bloom evidence with mapped forage abundance."""
+    """Combine seasonal timing (65%) with mapped agricultural forage (35%).
+
+    The larger flowering share rewards resources expected to be in bloom during
+    the stay instead of counting mapped crops as if they flowered all year. The
+    65/35 split is an explainable prototype assumption, not an official rule.
+    """
     return round(0.65 * flowering + 0.35 * landscape, 1)
 
 
 def continuity_score(flowering_days: list[dict], diversity: float) -> float:
-    """Reward a stable signal across the stay and multiple forage categories."""
+    """Reward stable flowering (70%) and mapped category diversity (30%).
+
+    Subtracting 1.5 standard deviations penalises short isolated peaks. Category
+    diversity is only a proxy: it does not prove simultaneous flowering or field
+    accessibility, so this component remains a prototype heuristic.
+    """
     values = [
         float(day["score"])
         for day in flowering_days
@@ -60,10 +80,11 @@ def continuity_score(flowering_days: list[dict], diversity: float) -> float:
 
 
 def distance_score(distance_km: float) -> float:
-    """Fixed logistics scale: 100 at the origin and zero from 50 km.
+    """Return visible logistics context: 100 at the origin, zero from 50 km.
 
     The search radius deliberately does not enter this calculation. Changing a
-    filter must not change the score of an otherwise identical destination.
+    filter must not change an otherwise identical destination. This value is
+    never included in the biological regional index.
     """
     return round(max(0, 100 - 2 * max(0, distance_km)), 1)
 
@@ -74,10 +95,14 @@ def calculate(
     continuity: float,
     logistics: float,
 ) -> dict:
+    """Return a biological regional index plus separate decision context.
+
+    ``logistics`` remains visible to the beekeeper but is not a score input: a
+    shorter drive does not improve forage for the colony.
+    """
     ranking_components = {
         "forage": forage,
         "continuity": continuity,
-        "logistics": logistics,
     }
     available = {name: _bounded(value) for name, value in ranking_components.items()}
     total = sum(available[name] * WEIGHTS[name] for name in WEIGHTS) / 100
@@ -91,7 +116,7 @@ def calculate(
                 else None
             ),
             "continuity": round(available["continuity"], 1),
-            "logistics": round(available["logistics"], 1),
+            "logistics": round(_bounded(logistics), 1),
         },
         "applied_weights": WEIGHTS.copy(),
         "forecast_confirmed": flight_weather is not None,
@@ -99,6 +124,12 @@ def calculate(
 
 
 def best_period(weather_days: list[dict], flowering_days: list[dict]) -> dict | None:
+    """Find the best three-day operational window inside the live forecast.
+
+    The window uses 55% bee-flight weather and 45% modelled flowering. It helps
+    time a move within the short forecast horizon; it is not evidence that the
+    destination is suitable for the colony's complete stay.
+    """
     flower_by_date = {item["date"]: item["score"] for item in flowering_days}
     daily = []
     for day in weather_days[:7]:
