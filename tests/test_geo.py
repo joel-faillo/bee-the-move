@@ -1,3 +1,8 @@
+"""AI-assisted test generation and revision: OpenAI Codex (OpenAI, n.d.-b).
+
+See ``AI_ASSISTANCE.md`` for scope, prompts and references.
+"""
+
 from services.geo import GeoAdminService, wgs84_to_lv95
 
 
@@ -51,11 +56,7 @@ class FakeHttp:
 
 class FakeCantonHttp:
     def get_json(self, *_args, **_kwargs):
-        return {
-            "results": [
-                {"attributes": {"ak": "SG", "name": "St. Gallen"}}
-            ]
-        }
+        return {"results": [{"attributes": {"ak": "SG", "name": "St. Gallen"}}]}
 
 
 def test_geocode_prefers_a_place_over_an_unrelated_gazetteer_result():

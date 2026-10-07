@@ -9,12 +9,13 @@ make the same landscape look biologically better or worse. Pollen, elevation,
 climate normals and map-only habitat context also remain outside the score
 because the available sources do not justify converting them into extra points.
 
-AI assistance: OpenAI Codex supported drafting and review. See
-``AI_ASSISTANCE.md`` for scope, prompts and the full citation.
+AI-assisted code generation and revision: OpenAI Codex (OpenAI, n.d.-b).
+See ``AI_ASSISTANCE.md`` for scope, prompts and references.
 """
 
 from __future__ import annotations
 
+from datetime import date
 from statistics import mean, pstdev
 
 WEIGHTS = {
@@ -26,7 +27,7 @@ WEIGHTS = {
 }
 
 
-def weather_score(days: list[dict]) -> float:
+def weather_score(days: list[dict]) -> float | None:
     """Summarise up to seven forecast days as operational flight context.
 
     This is deliberately excluded from the regional index: forecasts change
@@ -35,20 +36,9 @@ def weather_score(days: list[dict]) -> float:
     scores = [
         day["flight_score"] for day in days[:7] if day.get("flight_score") is not None
     ]
-    if scores:
-        return round(mean(scores), 1)
-    fallback = []
-    for day in days[:7]:
-        temperature, rain = day.get("temperature"), day.get("rain_mm")
-        if temperature is None and rain is None:
-            continue
-        temperature_part = (
-            _band_score(temperature, 7, 14, 30, 36) if temperature is not None else 50
-        )
-        fallback.append(
-            0.6 * temperature_part + 0.4 * max(0, 100 - 35 * max(0, rain or 0))
-        )
-    return round(mean(fallback), 1) if fallback else 0
+    # No temperature/rain-only fallback: missing wind or daylight information
+    # must remain unavailable rather than become an invented flight estimate.
+    return round(mean(scores), 1) if scores else None
 
 
 def forage_score(flowering: float, landscape: float) -> float:
@@ -69,13 +59,9 @@ def continuity_score(flowering_days: list[dict], diversity: float) -> float:
     accessibility, so this component remains a prototype heuristic.
     """
     values = [
-        float(day["score"])
-        for day in flowering_days
-        if day.get("score") is not None
+        float(day["score"]) for day in flowering_days if day.get("score") is not None
     ]
-    if not values:
-        return round(0.35 * diversity, 1)
-    stable = max(0.0, mean(values) - 1.5 * pstdev(values))
+    stable = max(0.0, mean(values) - 1.5 * pstdev(values)) if values else 0.0
     return round(0.7 * stable + 0.3 * diversity, 1)
 
 
@@ -135,40 +121,33 @@ def best_period(weather_days: list[dict], flowering_days: list[dict]) -> dict | 
     for day in weather_days[:7]:
         weather = day.get("flight_score")
         if weather is None:
-            weather = weather_score([day])
+            continue
         daily.append(
             (day["date"], 0.55 * weather + 0.45 * flower_by_date.get(day["date"], 0))
         )
     if not daily:
         return None
-    windows = [
-        (index, sum(score for _, score in daily[index : index + 3]))
-        for index in range(max(1, len(daily) - 2))
-    ]
-    start = max(windows, key=lambda item: item[1])[0]
-    end = min(start + 2, len(daily) - 1)
-    return {
-        "from": daily[start][0],
-        "to": daily[end][0],
-        "days": end - start + 1,
-    }
+    daily.sort()
+    # A missing forecast date must not create an apparently continuous window.
+    # Prefer three real consecutive days; shorter horizons remain explicit.
+    for length in range(min(3, len(daily)), 0, -1):
+        windows = [
+            daily[index : index + length] for index in range(len(daily) - length + 1)
+        ]
+        consecutive = [
+            window
+            for window in windows
+            if (
+                date.fromisoformat(window[-1][0]) - date.fromisoformat(window[0][0])
+            ).days
+            == length - 1
+        ]
+        if consecutive:
+            best = max(
+                consecutive, key=lambda window: mean(score for _, score in window)
+            )
+            return {"from": best[0][0], "to": best[-1][0], "days": length}
 
 
 def _bounded(value: float) -> float:
     return max(0.0, min(100.0, float(value)))
-
-
-def _band_score(
-    value: float,
-    outer_low: float,
-    ideal_low: float,
-    ideal_high: float,
-    outer_high: float,
-) -> float:
-    if ideal_low <= value <= ideal_high:
-        return 100
-    if value <= outer_low or value >= outer_high:
-        return 0
-    if value < ideal_low:
-        return 100 * (value - outer_low) / (ideal_low - outer_low)
-    return 100 * (outer_high - value) / (outer_high - ideal_high)

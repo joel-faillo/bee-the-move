@@ -2,6 +2,9 @@
 
 Keeping these pure rules outside ``app.py`` leaves the Streamlit page focused
 on layout while making the document workflow independently testable.
+
+AI-assisted code generation and revision: OpenAI Codex (OpenAI, n.d.-b).
+See ``AI_ASSISTANCE.md`` for scope, prompts and references.
 """
 
 from __future__ import annotations
@@ -117,6 +120,8 @@ def validate_move_form(form: dict, destination_canton: dict | None) -> str | Non
         return "Enter coordinates inside Switzerland."
     if destination_canton is None:
         return "GeoAdmin could not verify the exact destination canton. Check the coordinates or retry."
+    if destination_canton.get("code") == "TI" and form.get("colonies", 1) > 60:
+        return "Ticino limits a destination site to 60 colonies. Reduce this group and confirm the total already present with the inspector."
 
     start_date = form.get("start_date")
     move_date = form.get("move_date")

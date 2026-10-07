@@ -6,8 +6,8 @@ flowering, pesticide exposure or bee access. Category values and normalisation
 thresholds are therefore transparent prototype assumptions, not official
 nectar-yield coefficients.
 
-AI assistance: OpenAI Codex supported drafting and review. See
-``AI_ASSISTANCE.md`` for scope, prompts and the full citation.
+AI-assisted code generation and revision: OpenAI Codex (OpenAI, n.d.-b).
+See ``AI_ASSISTANCE.md`` for scope, prompts and references.
 """
 
 from __future__ import annotations
@@ -15,6 +15,10 @@ from __future__ import annotations
 import math
 from collections import defaultdict
 
+from shapely import make_valid
+from shapely.geometry import Point, shape
+
+from services.geo import wgs84_to_lv95
 from services.http import HttpClient
 
 AGRICULTURAL_URL = "https://www.geodienste.ch/db/lwb_nutzungsflaechen_v3_0_0/deu/ogcapi/collections/nutzungsflaechen/items"
@@ -53,6 +57,9 @@ class LandscapeService:
         weighted_square_metres = mapped_square_metres = 0.0
         categories = set()
         valid_feature_count = 0
+        circles = [
+            Point(easting, northing).buffer(radius) for radius in (1000, 2000, 3000)
+        ]
         for feature in features:
             props = feature.get("properties", {})
             if not _is_active_feature(props):
@@ -60,19 +67,26 @@ class LandscapeService:
             area = _number(props.get("flaeche_m2"))
             if area <= 0:
                 continue
-            valid_feature_count += 1
             name = str(props.get("nutzung", "Sconosciuto"))
             value, category = _forage_value(name)
-            x, y = _centroid(feature.get("geometry", {}).get("coordinates"))
-            distance = math.hypot(x - easting, y - northing) if x is not None else 3000
-            ring_weight = (
-                1.0
-                if distance <= 1000
-                else 0.6 if distance <= 2000 else 0.25 if distance <= 3200 else 0
+            geometry = _area_geometry(feature)
+            if geometry is None:
+                continue
+            within = [geometry.intersection(circle).area for circle in circles]
+            if within[2] <= 0:
+                continue
+            valid_feature_count += 1
+            # Multipart records may include distant fields. Allocate the declared
+            # crop area by the geometric share actually inside each distance ring.
+            scale = area / geometry.area
+            weighted_area = (
+                within[0]
+                + 0.6 * (within[1] - within[0])
+                + 0.25 * (within[2] - within[1])
             )
-            contribution = area * value * ring_weight
+            contribution = scale * weighted_area * value
             weighted_square_metres += contribution
-            mapped_square_metres += area
+            mapped_square_metres += scale * within[2]
             resources[category] += contribution
             if value >= 0.45:
                 categories.add(category)
@@ -94,7 +108,8 @@ class LandscapeService:
         )
         diversity = min(100, len(categories) * 20)
         return {
-            "available": valid_feature_count > 0,
+            # An incomplete OGC response cannot support a comparable regional rank.
+            "available": valid_feature_count > 0 and number_matched <= len(features),
             "score": round(0.8 * availability + 0.2 * diversity, 1),
             "diversity_score": round(diversity, 1),
             "mapped_hectares": round(mapped_square_metres / 10_000, 1),
@@ -116,13 +131,14 @@ class LandscapeService:
         }
 
     def map_points(self, lat: float, lon: float) -> list[dict]:
-        """Return lightweight centroids for useful forage map filters.
+        """Return representative crop points inside the 3 km forage area.
 
-        The source requires LV95 geometries. Only centroids are converted to
-        WGS84, keeping the browser response small and the visualisation honest:
-        these are mapped crop locations, not reconstructed field boundaries.
+        A point is guaranteed to lie on the locally clipped parcel geometry.
+        Multipart records must not appear at an average position between fields.
         """
         features, _number_matched = self._features(lat, lon)
+        easting, northing = wgs84_to_lv95(lat, lon)
+        circle = Point(easting, northing).buffer(3000)
         points = []
         for feature in features:
             props = feature.get("properties", {})
@@ -130,12 +146,14 @@ class LandscapeService:
                 continue
             name = str(props.get("nutzung", ""))
             _value, category = _forage_value(name)
-            easting, northing = _centroid(
-                feature.get("geometry", {}).get("coordinates")
-            )
-            if easting is None:
+            geometry = _area_geometry(feature)
+            if geometry is None:
                 continue
-            point_lat, point_lon = _lv95_to_wgs84(easting, northing)
+            clipped = geometry.intersection(circle)
+            if clipped.area <= 0:
+                continue
+            point = clipped.representative_point()
+            point_lat, point_lon = _lv95_to_wgs84(point.x, point.y)
             points.append(
                 {
                     "lat": round(point_lat, 6),
@@ -160,7 +178,7 @@ class LandscapeService:
             AGRICULTURAL_URL,
             params={
                 "f": "json",
-                "bbox": f"{lon-longitude_delta},{lat-latitude_delta},{lon+longitude_delta},{lat+latitude_delta}",
+                "bbox": f"{lon - longitude_delta},{lat - latitude_delta},{lon + longitude_delta},{lat + latitude_delta}",
                 "crs": CRS2056,
                 "limit": 1000,
             },
@@ -198,12 +216,12 @@ def _forage_value(name: str) -> tuple[float, str]:
         return 1.0, "Flower strips and biodiversity areas"
     if "sonnenbl" in value or "buchweizen" in value:
         return 1.0, "Flowering crops"
-    if any(term in value for term in ("extensiv", "wenig intensiv", "wiese")):
-        return 0.65, "Meadows"
     if "weide" in value or "sömmer" in value or "soemmer" in value:
         return 0.65, "Pastures"
     if "klee" in value or "luzerne" in value:
         return 0.65, "Clover and lucerne"
+    if any(term in value for term in ("extensiv", "wenig intensiv", "wiese")):
+        return 0.65, "Meadows"
     if any(term in value for term in LOW_VALUE):
         return 0.08, "Low-forage arable crops"
     return 0.25, "Other agricultural vegetation"
@@ -215,7 +233,9 @@ def _reference_years(features: list[dict]) -> list[int]:
         {
             year
             for feature in features
-            if isinstance((year := feature.get("properties", {}).get("bezugsjahr")), int)
+            if isinstance(
+                (year := feature.get("properties", {}).get("bezugsjahr")), int
+            )
         }
     )
 
@@ -236,26 +256,13 @@ def _is_active_feature(props: dict) -> bool:
     return True
 
 
-def _centroid(coordinates) -> tuple[float | None, float | None]:
-    points = []
-
-    def collect(value):
-        if (
-            isinstance(value, (list, tuple))
-            and len(value) >= 2
-            and all(isinstance(item, (int, float)) for item in value[:2])
-        ):
-            points.append((float(value[0]), float(value[1])))
-        elif isinstance(value, (list, tuple)):
-            for item in value:
-                collect(item)
-
-    collect(coordinates)
-    if not points:
-        return None, None
-    return sum(x for x, _ in points) / len(points), sum(y for _, y in points) / len(
-        points
-    )
+def _area_geometry(feature: dict):
+    """Validate official Polygon/MultiPolygon shapes in projected LV95 metres."""
+    raw = feature.get("geometry") or {}
+    if raw.get("type") not in {"Polygon", "MultiPolygon"}:
+        return None
+    geometry = make_valid(shape(raw))
+    return geometry if geometry.area > 0 else None
 
 
 def _number(value) -> float:

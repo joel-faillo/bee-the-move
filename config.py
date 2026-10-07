@@ -1,12 +1,19 @@
 """Environment-only runtime settings; scientific assumptions live in code.
 
-AI assistance: OpenAI Codex supported drafting and review. See
-``AI_ASSISTANCE.md`` for scope, prompts and the full citation.
+AI-assisted code generation and revision: OpenAI Codex (OpenAI, n.d.-b).
+See ``AI_ASSISTANCE.md`` for scope, prompts and references.
 """
 
 from __future__ import annotations
 
 import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# Load optional local settings before class attributes read the environment.
+# Existing environment variables (including Streamlit secrets) keep priority.
+load_dotenv(Path(__file__).with_name(".env"))
 
 
 class Config:

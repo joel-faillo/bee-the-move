@@ -1,4 +1,11 @@
+"""AI-assisted test generation and revision: OpenAI Codex (OpenAI, n.d.-b).
+
+See ``AI_ASSISTANCE.md`` for scope, prompts and references.
+"""
+
 from datetime import date
+import pytest
+from services.compliance import CANTON_RULES
 
 from streamlit.testing.v1 import AppTest
 
@@ -57,6 +64,86 @@ def _by_label(elements, label):
     return next(element for element in elements if element.label == label)
 
 
+def _cantonal_form_app(canton):
+    import app
+
+    class Geo:
+        def canton(self, lat, lon):
+            code = "SG" if lat > 47.4 else canton
+            return {"code": code, "name": code}
+
+    class Analysis:
+        geo = Geo()
+
+    destination = {
+        "name": "Test site",
+        "postal_code": "9000",
+        "lat": 47.33,
+        "lon": 9.41,
+    }
+    result = {
+        "origin": {"name": "St. Gallen", "lat": 47.4245, "lon": 9.3767},
+        "colony_count": 7,
+    }
+    app._move_preparation(Analysis(), result, destination)
+
+
+@pytest.mark.parametrize("canton", sorted(CANTON_RULES))
+def test_document_workflow_generates_correct_guidance_for_every_canton(canton):
+    at = _complete_form(
+        AppTest.from_function(
+            _cantonal_form_app, args=(canton,), default_timeout=30
+        ).run()
+    )
+    _by_label(at.button, "Prepare documents").click().run()
+    assert not at.exception
+    assert not at.error
+    prepared = at.session_state["prepared_documents"]
+    assert prepared["data"]["destination_canton"] == canton
+    assert prepared["data"]["colonies"] == 7
+    assert (
+        prepared["language"]
+        == DOCUMENT_LANGUAGE_OPTIONS[document_language_for_canton(canton)]
+    )
+    assert prepared["agreement"].startswith(b"%PDF")
+    assert prepared["stock_control"].startswith(b"PK")
+    assert any(
+        element.proto.url == CANTON_RULES[canton]["source_url"]
+        for element in at.get("link_button")
+    )
+    assert any(
+        area.label.startswith(f"Draft request for {canton}") for area in at.text_area
+    )
+
+
+def test_chart_dates_remain_temporal_with_european_labels():
+    import json
+
+    source = """
+import pandas as pd
+from app import _daily_chart
+_daily_chart(pd.DataFrame({"date": ["2026-12-31", "2027-01-01"], "score": [40, 50]}))
+"""
+    at = AppTest.from_string(source, default_timeout=30).run()
+    assert not at.exception
+    spec = json.loads(at.get("vega_lite_chart")[0].proto.spec)
+    assert spec["encoding"]["x"]["type"] == "temporal"
+    assert spec["encoding"]["x"]["axis"]["format"] == "%d/%m/%Y"
+
+
+def test_weather_dates_without_valid_assessments_are_reported_missing():
+    candidate = {"weather": {"days": [{"date": "2026-10-07", "flight_score": None}]}}
+    assert (
+        "weather was unavailable inside the current forecast horizon"
+        in _missing_evidence(candidate, {"forecast_lead_days": 0})
+    )
+
+
+@pytest.mark.parametrize("value", ["07/10/2026", "2026-10-07", date(2026, 10, 7)])
+def test_european_dates_are_not_reinterpreted_as_american(value):
+    assert _format_display_date(value) == "07/10/2026"
+
+
 def _complete_form(at, latitude=47.33, longitude=9.41):
     agreement_values = {
         "Name and surname *": "Anna Test",
@@ -69,7 +156,9 @@ def _complete_form(at, latitude=47.33, longitude=9.41):
         _by_label(at.text_input, label).set_value(value).run()
     _by_label(at.number_input, "Area (m²) *").set_value(100).run()
     _by_label(at.number_input, "Exact destination latitude *").set_value(latitude).run()
-    _by_label(at.number_input, "Exact destination longitude *").set_value(longitude).run()
+    _by_label(at.number_input, "Exact destination longitude *").set_value(
+        longitude
+    ).run()
     movement_values = {
         "Destination apiary number *": "SG-2",
         "Destination street / field address *": "Field 1",
@@ -85,9 +174,7 @@ def _complete_form(at, latitude=47.33, longitude=9.41):
     ).set_value("No").run()
     _by_label(at.radio, "Duration *").set_value("Open-ended").run()
     _by_label(at.date_input, "Use begins *").set_value(date(2026, 10, 1)).run()
-    _by_label(at.date_input, "Planned move date *").set_value(
-        date(2026, 10, 2)
-    ).run()
+    _by_label(at.date_input, "Planned move date *").set_value(date(2026, 10, 2)).run()
     _by_label(
         at.checkbox,
         "Required confirmation: I understand that I must review and sign the documents and complete any required cantonal notification.",
@@ -177,21 +264,34 @@ def test_every_form_selector_value_can_be_selected():
     at = AppTest.from_function(_form_app, default_timeout=30).run()
     groups = (
         (at.radio, "Installation on the site *", INSTALLATION_OPTIONS),
-        (at.radio, "Will a plan showing the site and access be attached? *", SITE_PLAN_OPTIONS),
+        (
+            at.radio,
+            "Will a plan showing the site and access be attached? *",
+            SITE_PLAN_OPTIONS,
+        ),
         (at.radio, "Duration *", DURATION_OPTIONS),
         (at.selectbox, "Notice period", NOTICE_PERIOD_OPTIONS),
         (at.selectbox, "Notice can end", NOTICE_TIMING_OPTIONS),
         (at.radio, "Compensation period", COMPENSATION_PERIOD_OPTIONS),
-        (at.selectbox, "Official BLV stock-control language", DOCUMENT_LANGUAGE_OPTIONS),
+        (
+            at.selectbox,
+            "Official BLV stock-control language",
+            DOCUMENT_LANGUAGE_OPTIONS,
+        ),
     )
     for _elements, label, options in groups:
         for value in options:
-            current_elements = at.radio if label in {
-                "Installation on the site *",
-                "Will a plan showing the site and access be attached? *",
-                "Duration *",
-                "Compensation period",
-            } else at.selectbox
+            current_elements = (
+                at.radio
+                if label
+                in {
+                    "Installation on the site *",
+                    "Will a plan showing the site and access be attached? *",
+                    "Duration *",
+                    "Compensation period",
+                }
+                else at.selectbox
+            )
             _by_label(current_elements, label).set_value(value).run()
             assert not at.exception
 
@@ -211,13 +311,15 @@ def test_location_autocomplete_formats_verified_choices_and_fails_closed():
     class Geo:
         def suggest(self, query):
             assert query == "9000"
-            return [{
-                "label": "9000 - St. Gallen",
-                "kind": "Postal code (CAP)",
-                "postal_code": "9000",
-                "lat": 47.425,
-                "lon": 9.376,
-            }]
+            return [
+                {
+                    "label": "9000 - St. Gallen",
+                    "kind": "Postal code (CAP)",
+                    "postal_code": "9000",
+                    "lat": 47.425,
+                    "lon": 9.376,
+                }
+            ]
 
     class Analysis:
         geo = Geo()
@@ -380,12 +482,17 @@ def test_move_form_validation_catches_dependent_fields_and_date_order():
     }
     canton = {"code": "SG", "name": "St. Gallen"}
 
-    assert validate_move_form(form, canton) == "Describe the installation selected as Other."
+    assert (
+        validate_move_form(form, canton)
+        == "Describe the installation selected as Other."
+    )
     form["other_installation"] = "Four hives"
     assert "end date" in validate_move_form(form, canton)
     form["end_date"] = date(2026, 10, 5)
     form["notice_timing"] = "Only on a specified date"
-    assert validate_move_form(form, canton) == "Enter the specified notice date or rule."
+    assert (
+        validate_move_form(form, canton) == "Enter the specified notice date or rule."
+    )
     form["specified_notice_date"] = "31/10"
     form["compensation"] = "CHF 100"
     assert "per year or per month" in validate_move_form(form, canton)
@@ -397,9 +504,10 @@ def test_exact_coordinates_drive_canton_and_language_then_generate_documents():
         latitude=46.04,
         longitude=8.95,
     )
-    assert _by_label(
-        at.selectbox, "Official BLV stock-control language"
-    ).value == "Italiano"
+    assert (
+        _by_label(at.selectbox, "Official BLV stock-control language").value
+        == "Italiano"
+    )
 
     _by_label(at.button, "Prepare documents").click().run()
 
@@ -423,3 +531,51 @@ def test_editing_a_field_invalidates_prepared_documents():
 
     assert "prepared_documents" not in at.session_state
     assert any("Prepare the documents again" in message.value for message in at.info)
+
+
+def test_edited_email_draft_is_used_and_regeneration_refreshes_it():
+    from urllib.parse import parse_qs, urlparse
+
+    at = _complete_form(AppTest.from_function(_form_app, default_timeout=30).run())
+    _by_label(at.button, "Prepare documents").click().run()
+    area = _by_label(at.text_area, "Draft request for SG — review before sending")
+    area.set_value("Edited request with my own details").run()
+    links = [
+        element.proto.url
+        for element in at.get("link_button")
+        if element.proto.url.startswith("mailto:")
+    ]
+    assert any(
+        parse_qs(urlparse(url).query)["body"] == ["Edited request with my own details"]
+        for url in links
+    )
+    _by_label(at.text_input, "Name and surname *").set_value("Updated Beekeeper").run()
+    _by_label(at.button, "Prepare documents").click().run()
+    assert (
+        "Updated Beekeeper"
+        in _by_label(at.text_area, "Draft request for SG — review before sending").value
+    )
+
+
+def test_planned_colony_count_carries_into_movement_form():
+    import inspect
+
+    source = inspect.getsource(_form_app).replace(
+        '"origin": {"name": "St. Gallen", "lat": 47.4245, "lon": 9.3767},',
+        '"origin": {"name": "St. Gallen", "lat": 47.4245, "lon": 9.3767}, "colony_count": 7,',
+    )
+    at = AppTest.from_string(source + "\n_form_app()", default_timeout=30).run()
+    assert not at.exception
+    assert _by_label(at.number_input, "Colonies moved *").value == 7
+
+
+def test_ticino_site_limit_is_checked_before_document_generation():
+    at = _complete_form(
+        AppTest.from_function(_form_app, default_timeout=30).run(),
+        latitude=46.04,
+        longitude=8.95,
+    )
+    _by_label(at.number_input, "Colonies moved *").set_value(61).run()
+    _by_label(at.button, "Prepare documents").click().run()
+    assert any("60 colonies" in error.value for error in at.error)
+    assert "prepared_documents" not in at.session_state

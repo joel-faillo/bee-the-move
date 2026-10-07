@@ -4,8 +4,8 @@ When an API key is configured, road distance replaces straight-line distance
 in the visible travel context. It never changes biological suitability because
 driving convenience does not improve forage available to the colony.
 
-AI assistance: OpenAI Codex supported drafting and review. See
-``AI_ASSISTANCE.md`` for scope, prompts and the full citation.
+AI-assisted code generation and revision: OpenAI Codex (OpenAI, n.d.-b).
+See ``AI_ASSISTANCE.md`` for scope, prompts and references.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ SNAP_RADIUS_METRES = 2_000
 
 
 class RoutingService:
-    """Fetch driving distance and duration for shortlisted destinations."""
+    """Fetch driving distance and duration for evaluated candidate areas."""
 
     def __init__(self, http: HttpClient, api_key: str) -> None:
         self.http = http
@@ -38,7 +38,10 @@ class RoutingService:
         data = self.http.post_json(
             ORS_URL,
             {
-                "coordinates": [[origin[1], origin[0]], [destination[1], destination[0]]],
+                "coordinates": [
+                    [origin[1], origin[0]],
+                    [destination[1], destination[0]],
+                ],
                 # GeoAdmin place labels and MeteoSwiss forecast points are
                 # geographic reference points, not guaranteed road addresses.
                 # The public API permits up to 2 km for snapping them to the

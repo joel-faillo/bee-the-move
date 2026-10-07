@@ -1,10 +1,10 @@
-"""Shared, bounded HTTP access for all external public-data services.
+"""Shared HTTP timeouts, retries and process-local TTL caching.
 
-Retries absorb brief upstream failures; the small in-memory cache avoids
+Retries absorb brief upstream failures; the in-memory cache avoids
 re-downloading large national CSV files during repeated analyses.
 
-AI assistance: OpenAI Codex supported drafting and review. See
-``AI_ASSISTANCE.md`` for scope, prompts and the full citation.
+AI-assisted code generation and revision: OpenAI Codex (OpenAI, n.d.-b).
+See ``AI_ASSISTANCE.md`` for scope, prompts and references.
 """
 
 from __future__ import annotations

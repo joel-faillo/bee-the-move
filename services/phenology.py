@@ -2,10 +2,12 @@
 
 This is observation data, not an official site-level flowering forecast. The
 app therefore reports a flowering *signal*: three nearby stations, the current
-season when available, and a ten-year median for gaps.
+season when available, and a median of the last ten valid observations for gaps.
+This general fallback does not apply the trained model's bee-species/category
+selection; it must not be presented as the same estimate as the trained model.
 
-AI assistance: OpenAI Codex supported drafting and review. See
-``AI_ASSISTANCE.md`` for scope, prompts and the full citation.
+AI-assisted code generation and revision: OpenAI Codex (OpenAI, n.d.-b).
+See ``AI_ASSISTANCE.md`` for scope, prompts and references.
 """
 
 from __future__ import annotations
@@ -25,6 +27,8 @@ PARAMETERS_URL = "https://data.geo.admin.ch/ch.meteoschweiz.ogd-phenology/ogd-ph
 
 
 class PhenologyService:
+    """Read nearby observation stations and provide an explicit seasonal fallback."""
+
     def __init__(self, http: HttpClient, station_count: int = 3) -> None:
         self.http = http
         self.station_count = station_count
@@ -92,7 +96,8 @@ class PhenologyService:
                 round(sum(day["score"] for day in daily) / len(daily)) if daily else 0
             ),
             "observed_current_season": current_fields,
-            "method": "3 stazioni vicine; anno corrente se disponibile, altrimenti mediana degli ultimi 10 anni",
+            "method": f"{self.station_count} nearby stations; current season when available, otherwise median of the last 10 observations",
+            "category_focus_note": "Observational fallback: a general phenological signal, not the trained bee-species or forage-category estimate.",
         }
 
     def nearest_station(self, lat: float, lon: float) -> dict | None:

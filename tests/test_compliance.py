@@ -1,7 +1,14 @@
+"""AI-assisted test generation and revision: OpenAI Codex (OpenAI, n.d.-b).
+
+See ``AI_ASSISTANCE.md`` for scope, prompts and references.
+"""
+
 from datetime import date
+import pytest
 
 from services.compliance import (
     CANTON_RULES,
+    CHECKED_ON,
     FSVO_BEES_URLS,
     FSVO_STOCK_CONTROL_GUIDE_URLS,
     FSVO_STOCK_CONTROL_TEMPLATE_URLS,
@@ -27,9 +34,32 @@ def test_current_cantonal_veterinary_directory_is_used():
 
 def test_every_canton_has_an_audited_official_source():
     cantons = {
-        "AG", "AI", "AR", "BE", "BL", "BS", "FR", "GE", "GL", "GR", "JU",
-        "LU", "NE", "NW", "OW", "SG", "SH", "SO", "SZ", "TG", "TI", "UR",
-        "VD", "VS", "ZG", "ZH",
+        "AG",
+        "AI",
+        "AR",
+        "BE",
+        "BL",
+        "BS",
+        "FR",
+        "GE",
+        "GL",
+        "GR",
+        "JU",
+        "LU",
+        "NE",
+        "NW",
+        "OW",
+        "SG",
+        "SH",
+        "SO",
+        "SZ",
+        "TG",
+        "TI",
+        "UR",
+        "VD",
+        "VS",
+        "ZG",
+        "ZH",
     }
 
     assert set(CANTON_RULES) == cantons
@@ -38,16 +68,38 @@ def test_every_canton_has_an_audited_official_source():
         assert rule["canton"] == canton
         assert rule["office"]
         assert rule["source_url"].startswith("https://")
-        assert rule["checked_on"] == "2026-09-28"
+        assert rule["checked_on"] == CHECKED_ON
         assert rule["notes"]
         steps = movement_steps(canton, canton)
         assert len(steps) >= 5
-        assert any("official" in step.lower() or "inspection" in step.lower() for step in steps)
+        assert any(
+            "official" in step.lower() or "inspection" in step.lower() for step in steps
+        )
 
 
 def test_cross_canton_move_requires_both_services():
     steps = movement_steps("SG", "TG")
     assert any("both the old and new locations" in step for step in steps)
+
+
+@pytest.mark.parametrize("origin", sorted(CANTON_RULES))
+@pytest.mark.parametrize("destination", sorted(CANTON_RULES))
+def test_every_canton_pair_preserves_required_guidance(origin, destination):
+    steps = movement_steps(origin, destination)
+    assert any("restriction zones" in step for step in steps)
+    assert any("three years" in step for step in steps)
+    if origin != destination:
+        assert any("both the old and new locations" in step for step in steps)
+        assert not any("need no notice" in step for step in steps)
+    for code in {origin, destination}:
+        if code == "TI":
+            assert any("60 colonies" in step for step in steps)
+        if code == "GL":
+            assert any("other bee races" in step for step in steps)
+        if code == "SG":
+            assert any("three working days" in step for step in steps)
+        if code == "VS":
+            assert any("validated" in step for step in steps)
 
 
 def test_same_canton_move_checks_inspection_district():
@@ -61,7 +113,13 @@ def test_verified_cantonal_differences_are_not_flattened():
     assert any("permit" in step for step in movement_steps("GL", "GL"))
     assert any("need no notice" in step for step in movement_steps("NE", "NE"))
     assert any("clearance" in step for step in movement_steps("TI", "TI"))
-    assert any("ten working days" in step for step in movement_steps("ZG", "ZG"))
+    assert any(
+        "shorter federal deadline" in step for step in movement_steps("ZG", "ZG")
+    )
+    assert any("three working days" in step for step in movement_steps("GR", "GR"))
+    assert any(
+        "origin inspector's signature" in step for step in movement_steps("ZH", "GR")
+    )
 
 
 def test_notice_uses_canton_language_without_repeating_canton():

@@ -1,4 +1,11 @@
+"""AI-assisted test generation and revision: OpenAI Codex (OpenAI, n.d.-b).
+
+See ``AI_ASSISTANCE.md`` for scope, prompts and references.
+"""
+
 from datetime import date, timedelta
+
+import pytest
 
 from ml.flowering_model import (
     BEE_RELEVANT_PARAMETERS,
@@ -10,7 +17,9 @@ from ml.flowering_model import (
 def test_persisted_model_predicts_a_bounded_signal():
     model = FloweringModel.load("model/flowering_model.joblib")
     assert model is not None
-    dates = [(date(2027, 4, 15) + timedelta(days=index)).isoformat() for index in range(7)]
+    dates = [
+        (date(2027, 4, 15) + timedelta(days=index)).isoformat() for index in range(7)
+    ]
     result = model.predict_signal(47.4245, 9.3767, 675, dates)
     assert result["available"]
     assert 0 <= result["score"] <= 100
@@ -18,9 +27,26 @@ def test_persisted_model_predicts_a_bounded_signal():
     assert result["predictions"]
 
 
+@pytest.mark.parametrize("height, expected", [(None, 600.0), (0.0, 0.0)])
+def test_height_imputation_only_replaces_missing_values(monkeypatch, height, expected):
+    model = FloweringModel.load("model/flowering_model.joblib")
+    original_predict = model.pipeline.predict
+    captured = []
+
+    def capture(frame):
+        captured.extend(frame["height_m"])
+        return original_predict(frame)
+
+    monkeypatch.setattr(model.pipeline, "predict", capture)
+    model.predict_signal(47.4245, 9.3767, height, ["2027-04-15"])
+    assert captured and all(value == expected for value in captured)
+
+
 def test_orchard_filter_uses_matching_observed_species():
     model = FloweringModel.load("model/flowering_model.joblib")
-    dates = [(date(2027, 4, 15) + timedelta(days=index)).isoformat() for index in range(30)]
+    dates = [
+        (date(2027, 4, 15) + timedelta(days=index)).isoformat() for index in range(30)
+    ]
 
     result = model.predict_signal(
         47.4245,
@@ -41,8 +67,7 @@ def test_orchard_filter_uses_matching_observed_species():
 def test_signal_can_cross_a_calendar_year():
     model = FloweringModel.load("model/flowering_model.joblib")
     dates = [
-        (date(2026, 12, 20) + timedelta(days=index)).isoformat()
-        for index in range(30)
+        (date(2026, 12, 20) + timedelta(days=index)).isoformat() for index in range(30)
     ]
 
     result = model.predict_signal(47.4245, 9.3767, 675, dates)

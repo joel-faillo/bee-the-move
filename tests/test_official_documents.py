@@ -1,3 +1,8 @@
+"""AI-assisted test generation and revision: OpenAI Codex (OpenAI, n.d.-b).
+
+See ``AI_ASSISTANCE.md`` for scope, prompts and references.
+"""
+
 from datetime import date
 import hashlib
 from io import BytesIO
@@ -58,7 +63,10 @@ def test_land_agreement_keeps_form_and_fills_all_guided_choices():
     assert len(reader.pages) == 2
     assert len(fields) == 30
     assert fields["Vereinbarung zwischen"]["/V"].startswith("Anna Beispiel")
-    assert fields["Imkerin  Imker"]["/V"] == "Joel Beispiel, Feldstrasse 1, 9000 St. Gallen"
+    assert (
+        fields["Imkerin  Imker"]["/V"]
+        == "Joel Beispiel, Feldstrasse 1, 9000 St. Gallen"
+    )
     assert fields["Check Box1"]["/V"] == "/Ja"
     assert fields["Ja empfohlen"]["/V"] == "/On"
     assert fields["befristet bis"]["/V"] == "/On"
@@ -130,8 +138,16 @@ def test_unknown_stock_control_language_is_rejected():
 @pytest.mark.parametrize(
     ("choice", "field", "value"),
     [
-        ("Bee house", "ein Bienenhaus gestellt Fahrnisbaute Pläne oder Fotos liegen bei", "/On"),
-        ("Hives without a bee house", "kein Bienenhaus gestellt Pläne oder Fotos von Bienenbeute liegen bei", "/On"),
+        (
+            "Bee house",
+            "ein Bienenhaus gestellt Fahrnisbaute Pläne oder Fotos liegen bei",
+            "/On",
+        ),
+        (
+            "Hives without a bee house",
+            "kein Bienenhaus gestellt Pläne oder Fotos von Bienenbeute liegen bei",
+            "/On",
+        ),
         ("Other", "Check Box1", "/Ja"),
     ],
 )
@@ -142,7 +158,9 @@ def test_every_installation_option_maps_to_the_original_pdf(choice, field, value
     assert fields[field]["/V"] == value
 
 
-@pytest.mark.parametrize(("attached", "field"), [(True, "Ja empfohlen"), (False, "Nein")])
+@pytest.mark.parametrize(
+    ("attached", "field"), [(True, "Ja empfohlen"), (False, "Nein")]
+)
 def test_both_site_plan_options_map_to_the_original_pdf(attached, field):
     data = _data()
     data["site_plan_attached"] = attached

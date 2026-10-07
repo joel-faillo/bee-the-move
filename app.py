@@ -1,9 +1,7 @@
 """Bee the Move - one guided Streamlit workflow.
 
-AI assistance citation: OpenAI Codex helped draft and revise this interface
-between 21 and 29 September 2026. The project team must review the code and
-describe that use in the submitted video and list of aids. See
-``AI_ASSISTANCE.md`` for prompts, scope and the full reference.
+AI-assisted code generation and revision: OpenAI Codex (OpenAI, n.d.-b).
+See ``AI_ASSISTANCE.md`` for scope, prompts and references.
 """
 
 from __future__ import annotations
@@ -13,9 +11,9 @@ from pathlib import Path
 from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
+import altair as alt
 import pandas as pd
 import streamlit as st
-from dotenv import load_dotenv
 from streamlit_searchbox import st_searchbox
 
 from analysis import BeeMoveAnalysis
@@ -48,7 +46,6 @@ from ui.move_form import (
     validate_move_form,
 )
 
-load_dotenv()
 st.set_page_config(page_title="Bee the Move", page_icon="🐝", layout="wide")
 
 RADIUS_OPTIONS = (2, 5, 10, 15, 20, 30, 50)
@@ -60,6 +57,7 @@ ELEVATION_OPTIONS = (
     "600–1,000 m",
     "Above 1,000 m",
 )
+
 
 @st.cache_resource
 def build_analysis() -> BeeMoveAnalysis:
@@ -133,10 +131,21 @@ def _header() -> None:
 def _intro() -> None:
     with st.expander("New here? See how it works"):
         a, b, c = st.columns(3)
-        a.markdown('<div class="step"><b>1 · Plan the stay</b><br>Choose the current place, arrival date, expected end and radius.</div>', unsafe_allow_html=True)
-        b.markdown('<div class="step"><b>2 · Compare evidence</b><br>Separate regional suitability from short-term bee-flight conditions.</div>', unsafe_allow_html=True)
-        c.markdown('<div class="step"><b>3 · Prepare</b><br>Fill your details once and download prefilled source documents.</div>', unsafe_allow_html=True)
-        st.caption("Decision support is not a field inspection, land permission or health clearance.")
+        a.markdown(
+            '<div class="step"><b>1 · Plan the stay</b><br>Choose the current place, arrival date, expected end and radius.</div>',
+            unsafe_allow_html=True,
+        )
+        b.markdown(
+            '<div class="step"><b>2 · Compare evidence</b><br>Separate regional suitability from short-term bee-flight conditions.</div>',
+            unsafe_allow_html=True,
+        )
+        c.markdown(
+            '<div class="step"><b>3 · Prepare</b><br>Fill your details once and download prefilled source documents.</div>',
+            unsafe_allow_html=True,
+        )
+        st.caption(
+            "Decision support is not a field inspection, land permission or health clearance."
+        )
 
 
 def _search(analysis: BeeMoveAnalysis) -> None:
@@ -152,10 +161,14 @@ def _search(analysis: BeeMoveAnalysis) -> None:
             clear_on_submit=False,
             edit_after_submit="option",
         )
-        st.caption("Type at least two characters and select one official place or postcode.")
+        st.caption(
+            "Type at least two characters and select one official place or postcode."
+        )
     with radius_col:
         radius = st.selectbox(
-            "Maximum search radius", RADIUS_OPTIONS, index=2,
+            "Maximum search radius",
+            RADIUS_OPTIONS,
+            index=2,
             format_func=lambda value: f"{value} km",
         )
         st.caption("Direct search radius; the road route can be longer.")
@@ -172,7 +185,7 @@ def _search(analysis: BeeMoveAnalysis) -> None:
             format="DD/MM/YYYY",
             help=(
                 "If this date is within MeteoSwiss's current nine-day horizon, the app "
-                "also evaluates the real transfer weather. Later dates use seasonal evidence only."
+                "also shows forecast conditions for bee flight. Later dates use seasonal evidence only."
             ),
             key="planned_arrival",
             on_change=_keep_valid_planning_period,
@@ -216,7 +229,8 @@ def _search(analysis: BeeMoveAnalysis) -> None:
         forage_col, elevation_col = st.columns(2)
         with forage_col:
             forage_choice = st.selectbox(
-                "Forage focus", FORAGE_OPTIONS,
+                "Forage focus",
+                FORAGE_OPTIONS,
                 help=(
                     "The selected mapped category becomes the ranking target. Orchard, meadow "
                     "and pasture also focus the flowering model on matching observed species; "
@@ -232,8 +246,29 @@ def _search(analysis: BeeMoveAnalysis) -> None:
 
     if selected:
         st.caption(f"Selected: **{selected['label']}** · {selected['kind']}")
+    previous = st.session_state.get("analysis_result")
+    if previous and (
+        not selected
+        or (selected["lat"], selected["lon"])
+        != (previous["origin"]["lat"], previous["origin"]["lon"])
+        or radius != previous["radius_km"]
+        or analysis_date.isoformat() != previous["analysis_date"]
+        or planning_end_date.isoformat() != previous["planning_end_date"]
+        or int(colony_count) != previous.get("colony_count", 1)
+        or (None if forage_choice == "Balanced mix" else forage_choice)
+        != previous.get("forage_preference")
+        or elevation_choice != previous.get("elevation_preference", "Any elevation")
+    ):
+        st.info(
+            "Search settings changed. Run Compare nearby areas again; the results below still describe the previous search."
+        )
 
-    if st.button("Compare nearby areas", type="primary", width="stretch", disabled=selected is None):
+    if st.button(
+        "Compare nearby areas",
+        type="primary",
+        width="stretch",
+        disabled=selected is None,
+    ):
         try:
             with st.spinner("Comparing the planned stay with official Swiss datasets…"):
                 result = analysis.run(
@@ -249,14 +284,19 @@ def _search(analysis: BeeMoveAnalysis) -> None:
             st.session_state["selected_destination"] = result["results"][0]["name"]
             st.session_state.pop("prepared_documents", None)
             st.session_state.pop("document_form_error", None)
+            st.session_state.pop("move_colonies", None)
             st.rerun()
         except ValueError as exc:
             st.error(str(exc))
         except Exception:
-            st.error("One or more public sources are temporarily unavailable. Please retry.")
+            st.error(
+                "One or more public sources are temporarily unavailable. Please retry."
+            )
 
 
-def _location_suggestions(analysis: BeeMoveAnalysis, searchterm: str) -> list[tuple[str, dict]]:
+def _location_suggestions(
+    analysis: BeeMoveAnalysis, searchterm: str
+) -> list[tuple[str, dict]]:
     """Return live GeoAdmin choices for the single autocomplete field."""
     if len(searchterm.strip()) < 2:
         return []
@@ -275,9 +315,15 @@ def _empty_state() -> None:
     st.divider()
     st.subheader("One search, one complete decision path")
     left, middle, right = st.columns(3)
-    left.markdown("**Official data context**\n\nCurrent MeteoSwiss weather, historical climate and phenology, plus annually mapped agricultural resources.")
-    middle.markdown("**Explainable regional screening**\n\nEvery result shows its components; your searched place is always retained as a benchmark.")
-    right.markdown("**Practical next step**\n\nThe selected destination flows into the land agreement, stock record and notification draft.")
+    left.markdown(
+        "**Official data context**\n\nCurrent MeteoSwiss weather, historical climate and phenology, plus annually mapped agricultural resources."
+    )
+    middle.markdown(
+        "**Explainable regional screening**\n\nEvery result shows its components; your searched place is always retained as a benchmark."
+    )
+    right.markdown(
+        "**Practical next step**\n\nThe selected destination flows into the land agreement, stock record and notification draft."
+    )
 
 
 def _results(result: dict) -> dict:
@@ -318,13 +364,20 @@ def _results(result: dict) -> dict:
             if item.get("score") is not None
             else "partial evidence"
         )
-        +
-        (" · searched area" if item["is_origin_area"] else "")
+        + (" · searched area" if item["is_origin_area"] else "")
         for item in candidates
     ]
     current = st.session_state.get("selected_destination", candidates[0]["name"])
-    current_index = next((i for i, item in enumerate(candidates) if item["name"] == current), 0)
-    chosen = st.radio("Choose an area", labels, index=current_index, horizontal=True, label_visibility="collapsed")
+    current_index = next(
+        (i for i, item in enumerate(candidates) if item["name"] == current), 0
+    )
+    chosen = st.radio(
+        "Choose an area",
+        labels,
+        index=current_index,
+        horizontal=True,
+        label_visibility="collapsed",
+    )
     selected = candidates[labels.index(chosen)]
     if selected["name"] != current:
         st.session_state.pop("prepared_documents", None)
@@ -335,7 +388,7 @@ def _results(result: dict) -> dict:
     with map_column:
         st.iframe(map_html(result, selected["name"]), height=540)
         st.caption(
-            "Map controls switch each evidence layer on or off. Small pale-green dots are centroids of mapped "
+            "Map controls switch each evidence layer on or off. Up to 400 small pale-green dots show representative points on mapped "
             "agricultural parcels near the searched place; they are not flowering observations. The official "
             "FOEN–WSL habitat layer is visual context and does not add score."
         )
@@ -354,15 +407,23 @@ def _results(result: dict) -> dict:
         if selected["is_origin_area"]:
             distance_label, distance_value = "Distance", "Searched area"
         elif route:
-            distance_label, distance_value = "Road distance", f"{route['distance_km']:.1f} km"
+            distance_label, distance_value = (
+                "Road distance",
+                f"{route['distance_km']:.1f} km",
+            )
         else:
-            distance_label, distance_value = "Direct distance", f"{selected['distance_km']:.1f} km"
+            distance_label, distance_value = (
+                "Direct distance",
+                f"{selected['distance_km']:.1f} km",
+            )
         b.metric(distance_label, distance_value)
         st.caption(
             "The regional index uses flowering and mapped forage 75% and continuity 25%. "
             "Travel and short-term weather are shown separately and never change biological site potential."
         )
-        st.caption("The searched area stays visible as a benchmark even when it is not among the three highest regional indices.")
+        st.caption(
+            "The searched area stays visible as a benchmark even when it is not among the three highest regional indices."
+        )
         for key, title in (
             ("forage", "Flowering & mapped forage during the stay"),
             ("flight_weather", "Short-term bee-flight conditions (not ranked)"),
@@ -384,20 +445,17 @@ def _results(result: dict) -> dict:
 
     weather = pd.DataFrame(selected["weather"]["days"])
     flowering = pd.DataFrame(selected["flowering"].get("daily", []))
-    for frame in (weather, flowering):
-        if not frame.empty and "date" in frame:
-            frame["date"] = frame["date"].map(_format_display_date)
     left, right = st.columns(2)
     with left:
         st.markdown("**Short-term bee-flight conditions from the planned arrival**")
-        if not weather.empty:
-            st.line_chart(weather.set_index("date")[["flight_score"]], y_label="score")
+        if not weather.empty and weather["flight_score"].notna().any():
+            _daily_chart(weather.rename(columns={"flight_score": "score"}))
         else:
             st.caption("No forecast series available.")
     with right:
         st.markdown("**Modelled flowering signal across the planned stay**")
         if not flowering.empty and flowering["score"].gt(0).any():
-            st.line_chart(flowering.set_index("date")[["score"]], y_label="score")
+            _daily_chart(flowering)
         elif not flowering.empty:
             st.caption("No meaningful flowering signal is modelled for this period.")
         else:
@@ -405,13 +463,26 @@ def _results(result: dict) -> dict:
 
     with st.expander("More evidence for this area"):
         a, b, c = st.columns(3)
-        a.metric("Elevation", f"{selected['height_m']:.0f} m" if selected["height_m"] is not None else "Not available")
+        a.metric(
+            "Elevation",
+            f"{selected['height_m']:.0f} m"
+            if selected["height_m"] is not None
+            else "Not available",
+        )
         a.caption("Context and model feature; no direct regional-index points.")
-        b.metric("Mapped forage", f"{selected['landscape'].get('forage_hectares_equivalent', 0):.1f} ha eq.")
-        b.caption(", ".join(selected["landscape"].get("top_resources", [])) or "No mapped categories returned.")
+        b.metric(
+            "Mapped forage",
+            f"{selected['landscape'].get('forage_hectares_equivalent', 0):.1f} ha eq.",
+        )
+        b.caption(
+            ", ".join(selected["landscape"].get("top_resources", []))
+            or "No mapped categories returned."
+        )
         pollen = result.get("pollen", {})
         if pollen.get("available"):
-            c.metric("Pollen station near searched place", pollen.get("station", "Available"))
+            c.metric(
+                "Pollen station near searched place", pollen.get("station", "Available")
+            )
             pollen_time = _source_timestamp(pollen.get("timestamp"))
             c.caption(
                 f"{pollen.get('station_distance_km')} km from the searched place · "
@@ -426,7 +497,9 @@ def _results(result: dict) -> dict:
             a, b, c = st.columns(3)
             a.metric("Mean temperature", f"{climate['temperature_c']:.1f} °C")
             b.metric("Typical precipitation", f"{climate['precipitation_mm']:.0f} mm")
-            c.metric("Relative sunshine", f"{climate['relative_sunshine_percent']:.0f}%")
+            c.metric(
+                "Relative sunshine", f"{climate['relative_sunshine_percent']:.0f}%"
+            )
             st.caption(
                 "MeteoSwiss 1991–2020 monthly normals for the nearest 1 km grid cell, "
                 "weighted to the selected dates. These describe typical climate, not this year's weather."
@@ -455,7 +528,9 @@ def _results(result: dict) -> dict:
         if category_note:
             st.caption(f"Forage filter · {category_note}")
         freshness = []
-        forecast_updated = result.get("sources", {}).get("meteoswiss_forecast", {}).get("updated")
+        forecast_updated = (
+            result.get("sources", {}).get("meteoswiss_forecast", {}).get("updated")
+        )
         if forecast_updated:
             freshness.append(f"forecast updated {_source_timestamp(forecast_updated)}")
         reference_years = selected.get("landscape", {}).get("reference_years", [])
@@ -465,13 +540,33 @@ def _results(result: dict) -> dict:
             )
         model_source = selected.get("flowering", {}).get("source_updated")
         if model_source:
-            freshness.append(f"flowering-model source snapshot {_source_timestamp(model_source)}")
+            freshness.append(
+                f"flowering-model source snapshot {_source_timestamp(model_source)}"
+            )
         climate_snapshot = selected.get("climate_normals", {}).get("source_snapshot")
         if climate_snapshot:
-            freshness.append(f"climate-normal snapshot {climate_snapshot}")
+            freshness.append(
+                f"climate-normal snapshot {_format_display_date(climate_snapshot)}"
+            )
         if freshness:
             st.caption("Data freshness · " + " · ".join(freshness))
     return selected
+
+
+def _daily_chart(frame: pd.DataFrame) -> None:
+    """Keep real chronological dates while displaying the European format."""
+    data = frame[["date", "score"]].copy()
+    data["date"] = pd.to_datetime(data["date"])
+    chart = (
+        alt.Chart(data)
+        .mark_line()
+        .encode(
+            x=alt.X("date:T", title=None, axis=alt.Axis(format="%d/%m/%Y")),
+            y=alt.Y("score:Q", title="score", scale=alt.Scale(domain=[0, 100])),
+            tooltip=[alt.Tooltip("date:T", format="%d/%m/%Y"), alt.Tooltip("score:Q")],
+        )
+    )
+    st.altair_chart(chart, width="stretch")
 
 
 def _site_verification(result: dict, destination: dict) -> None:
@@ -487,6 +582,7 @@ def _site_verification(result: dict, destination: dict) -> None:
         "The position is dry, sheltered from wind and shaded around midday in summer.",
         "Vehicle access, loading space and safe hive orientation have been checked.",
         "Distances from paths, public buildings, mating stations and neighbouring apiaries are acceptable.",
+        "Mowing dates, pesticide treatments and the actual flowering and accessibility of forage have been checked locally.",
         "The landowner agrees and the precise parcel or site coordinates are known.",
         "Current disease restrictions and cantonal requirements have been checked.",
     )
@@ -496,18 +592,26 @@ def _site_verification(result: dict, destination: dict) -> None:
             st.checkbox(label, key=f"{key_base}-{index}")
             for index, label in enumerate(checks)
         )
-        st.progress(completed / len(checks), text=f"{completed}/{len(checks)} checks confirmed")
+        st.progress(
+            completed / len(checks), text=f"{completed}/{len(checks)} checks confirmed"
+        )
         if result.get("colony_count", 1) > 15:
             st.warning(
                 "The planned group exceeds the usual recommendation of 10–15 colonies per site."
             )
         if completed == len(checks):
-            st.success("The practical site checks have been acknowledged. Official approval may still be required.")
+            st.success(
+                "The practical site checks have been acknowledged. Official approval may still be required."
+            )
         else:
-            st.caption("Unchecked items remain field tasks; Bee the Move does not infer them from incomplete public data.")
+            st.caption(
+                "Unchecked items remain field tasks; Bee the Move does not infer them from incomplete public data."
+            )
 
 
-def _move_preparation(analysis: BeeMoveAnalysis, result: dict, destination: dict) -> None:
+def _move_preparation(
+    analysis: BeeMoveAnalysis, result: dict, destination: dict
+) -> None:
     st.divider()
     keep_open = bool(
         st.session_state.get("prepared_documents")
@@ -535,9 +639,10 @@ def _move_preparation_content(
     origin_code = origin_canton.get("code", "") if origin_canton else ""
     suggested_destination_code = (
         suggested_destination_canton.get("code", "")
-        if suggested_destination_canton else ""
+        if suggested_destination_canton
+        else ""
     )
-    origin_office = compliance.veterinary_office(origin_code)
+    origin_office = compliance.cantonal_rule(origin_code)
 
     with st.container():
         st.subheader("1 · Beekeeper")
@@ -556,7 +661,9 @@ def _move_preparation_content(
                 "where one has been assigned. The Italian source template has no dedicated line for it."
             ),
         )
-        section = c.text_input("Beekeeping section", placeholder="e.g. Imkerverein St. Gallen")
+        section = c.text_input(
+            "Beekeeping section", placeholder="e.g. Imkerverein St. Gallen"
+        )
         a, b = st.columns(2)
         beekeeper_street = a.text_input(
             "Street and number *", placeholder="e.g. Rosenbergstrasse 10"
@@ -588,19 +695,28 @@ def _move_preparation_content(
             ),
         )
         area_m2 = c.number_input(
-            "Area (m²) *", min_value=0, step=1,
+            "Area (m²) *",
+            min_value=0,
+            step=1,
             help="Official PDF field: surface of land made available for the apiary.",
         )
         installation = st.radio(
             "Installation on the site *",
-            INSTALLATION_OPTIONS, horizontal=True,
+            INSTALLATION_OPTIONS,
+            horizontal=True,
             help="Choose the wording that the official agreement should tick.",
         )
-        other_installation = st.text_input(
-            "Describe the installation", placeholder="e.g. four magazine hives"
-        ) if installation == "Other" else ""
+        other_installation = (
+            st.text_input(
+                "Describe the installation", placeholder="e.g. four magazine hives"
+            )
+            if installation == "Other"
+            else ""
+        )
         site_plan = st.radio(
-            "Will a plan showing the site and access be attached? *", SITE_PLAN_OPTIONS, horizontal=True,
+            "Will a plan showing the site and access be attached? *",
+            SITE_PLAN_OPTIONS,
+            horizontal=True,
         )
         st.caption(
             "The agreement records only Yes or No. Attach the plan separately to the signed agreement; "
@@ -619,9 +735,13 @@ def _move_preparation_content(
         a, b = st.columns(2)
         notice_period = a.selectbox("Notice period", NOTICE_PERIOD_OPTIONS)
         notice_timing = b.selectbox("Notice can end", NOTICE_TIMING_OPTIONS)
-        specified_notice_date = st.text_input(
-            "Specified notice date or rule", placeholder="e.g. 31/10 of each year"
-        ) if notice_timing == "Only on a specified date" else ""
+        specified_notice_date = (
+            st.text_input(
+                "Specified notice date or rule", placeholder="e.g. 31/10 of each year"
+            )
+            if notice_timing == "Only on a specified date"
+            else ""
+        )
         other_notice_rule = st.text_input(
             "Other notice timing (optional)",
             placeholder="e.g. after the honey harvest",
@@ -636,7 +756,9 @@ def _move_preparation_content(
         compensation = a.text_input(
             "Compensation amount / description (optional)", placeholder="e.g. CHF 100"
         )
-        compensation_period = b.radio("Compensation period", COMPENSATION_PERIOD_OPTIONS, horizontal=True)
+        compensation_period = b.radio(
+            "Compensation period", COMPENSATION_PERIOD_OPTIONS, horizontal=True
+        )
 
         st.subheader("3 · Apiary and movement record")
         st.caption(
@@ -686,13 +808,16 @@ def _move_preparation_content(
                         "Check them or retry before preparing documents."
                     )
             else:
-                st.warning("The entered coordinates are outside the Swiss bounding area.")
+                st.warning(
+                    "The entered coordinates are outside the Swiss bounding area."
+                )
 
         destination_code = (
             exact_destination_canton.get("code", "")
-            if exact_destination_canton else suggested_destination_code
+            if exact_destination_canton
+            else suggested_destination_code
         )
-        office = compliance.veterinary_office(destination_code)
+        office = compliance.cantonal_rule(destination_code)
 
         language_labels = list(DOCUMENT_LANGUAGE_OPTIONS)
         document_language_default = document_language_for_canton(destination_code)
@@ -711,12 +836,14 @@ def _move_preparation_content(
         blv_labels = BLV_FIELD_LABELS[document_language]
         a, b, c = st.columns(3)
         apiary_number = a.text_input(
-            "Destination apiary number *", placeholder="e.g. SG-456",
+            "Destination apiary number *",
+            placeholder="e.g. SG-456",
             key="destination_apiary_number",
             help=f"Official BLV field: {blv_labels['apiary']}.",
         )
         site_street = b.text_input(
-            "Destination street / field address *", placeholder="e.g. parcel 123, Feldweg",
+            "Destination street / field address *",
+            placeholder="e.g. parcel 123, Feldweg",
             key="destination_site_street",
             help=f"Official BLV field: {blv_labels['street']}.",
         )
@@ -730,14 +857,22 @@ def _move_preparation_content(
         a, b, c = st.columns(3)
         suggested_move_date = (
             date.fromisoformat(result["analysis_date"])
-            if result.get("analysis_date") else None
+            if result.get("analysis_date")
+            else None
         )
         move_date = a.date_input(
             "Planned move date *", value=suggested_move_date, format="DD/MM/YYYY"
         )
-        colonies = b.number_input("Colonies moved *", min_value=1, value=1, step=1)
+        colonies = b.number_input(
+            "Colonies moved *",
+            min_value=1,
+            value=int(result.get("colony_count", 1)),
+            step=1,
+            key="move_colonies",
+        )
         origin_apiary_number = c.text_input(
-            "Origin apiary number *", placeholder="e.g. SG-111",
+            "Origin apiary number *",
+            placeholder="e.g. SG-111",
             key="origin_apiary_number",
             help=f"Official BLV movement field: {blv_labels['origin']}.",
         )
@@ -766,7 +901,9 @@ def _move_preparation_content(
 
     form_state = {
         "destination_key": (
-            destination["name"], destination["lat"], destination["lon"]
+            destination["name"],
+            destination["lat"],
+            destination["lon"],
         ),
         "document_language": document_language,
         "beekeeper": beekeeper,
@@ -806,12 +943,20 @@ def _move_preparation_content(
     }
 
     if submitted:
-        validation_error = validate_move_form(form_state, exact_destination_canton)
+        validation_error = (
+            "GeoAdmin could not verify the origin canton. Retry before preparing documents."
+            if not origin_canton
+            else validate_move_form(form_state, exact_destination_canton)
+        )
         if validation_error:
             st.session_state["document_form_error"] = True
             st.error(validation_error)
         else:
             st.session_state.pop("document_form_error", None)
+            # Regeneration must also replace drafts left over from older form data.
+            for key in list(st.session_state):
+                if key.startswith("health-message-"):
+                    del st.session_state[key]
             data = build_document_data(
                 form_state,
                 origin_name=result["origin"]["name"],
@@ -820,7 +965,8 @@ def _move_preparation_content(
                 veterinary_office_name=office["office"],
             )
             st.session_state["prepared_documents"] = {
-                "destination": destination["name"], "language": document_language,
+                "destination": destination["name"],
+                "language": document_language,
                 "form_state": form_state,
                 "data": data,
                 "agreement": fill_land_agreement(data),
@@ -831,24 +977,33 @@ def _move_preparation_content(
     if prepared and prepared.get("form_state") != form_state:
         st.session_state.pop("prepared_documents", None)
         prepared = None
-        st.info("The form changed. Prepare the documents again to update the downloads.")
+        st.info(
+            "The form changed. Prepare the documents again to update the downloads."
+        )
     if (
         prepared
         and prepared.get("destination") == destination["name"]
         and prepared.get("language") == document_language
     ):
-        st.success("Ready for review: the original source templates have been prefilled.")
+        st.success(
+            "Ready for review: the original source templates have been prefilled."
+        )
         left, right = st.columns(2)
         left.download_button(
-            "Download filled site agreement (DE)", prepared["agreement"],
-            file_name="bienenschweiz-site-agreement-filled.pdf", mime="application/pdf", width="stretch",
+            "Download filled site agreement (DE)",
+            prepared["agreement"],
+            file_name="bienenschweiz-site-agreement-filled.pdf",
+            mime="application/pdf",
+            width="stretch",
         )
         right.download_button(
-            "Download filled BLV stock-control form", prepared["stock_control"],
+            "Download filled BLV stock-control form",
+            prepared["stock_control"],
             file_name="blv-stock-control-filled.docx",
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", width="stretch",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            width="stretch",
         )
-        prepared_office = compliance.veterinary_office(
+        prepared_office = compliance.cantonal_rule(
             prepared["data"]["destination_canton"]
         )
         _health_notification(prepared["data"], origin_office, prepared_office)
@@ -877,7 +1032,7 @@ def _move_preparation_content(
                 item["source_url"],
             )
         st.caption(
-            "Cantonal pages were checked on 28/09/2026. Temporary restriction zones and contacts can change, "
+            f"Cantonal guidance reviewed on {_format_display_date(compliance.CHECKED_ON)}. Temporary restriction zones and contacts can change, "
             "so the official page remains the deciding source."
         )
         bee_rules_url = compliance.FSVO_BEES_URLS.get(
@@ -928,7 +1083,9 @@ def _move_preparation_content(
             )
 
 
-def _health_notification(data: dict, origin_office: dict, destination_office: dict) -> None:
+def _health_notification(
+    data: dict, origin_office: dict, destination_office: dict
+) -> None:
     """Prepare—not send—a review request for the competent authority."""
     st.subheader("4 · Movement review request")
     st.write(
@@ -937,19 +1094,27 @@ def _health_notification(data: dict, origin_office: dict, destination_office: di
     valid = False
     for item in _distinct_offices(origin_office, destination_office):
         subject, body = compliance.notification_copy(data, item["canton"])
-        st.text_area(
+        body = st.text_area(
             f"Draft request for {item['canton']} — review before sending",
-            body, height=300, key=f"health-message-{item['canton']}",
+            body,
+            height=300,
+            key=f"health-message-{item['canton']}",
         )
         if "@" in item["email"]:
             valid = True
-            mailto = f"mailto:{item['email']}?subject={quote(subject)}&body={quote(body)}"
+            mailto = (
+                f"mailto:{item['email']}?subject={quote(subject)}&body={quote(body)}"
+            )
             st.link_button(
-                f"Open email for {item['canton']} · {item['email']}", mailto,
-                type="primary", width="stretch",
+                f"Open email for {item['canton']} · {item['email']}",
+                mailto,
+                type="primary",
+                width="stretch",
             )
     if not valid:
-        st.warning("The competent email could not be resolved. Use the official cantonal directory above.")
+        st.warning(
+            "The competent email could not be resolved. Use the official cantonal directory above."
+        )
     st.caption(
         "The BLV requires notification to the bee inspector of the old and new inspection districts. "
         "The linked canton-specific rule can be stricter. Bee the Move does not send the message or confirm clearance."
@@ -972,16 +1137,56 @@ def _method_and_sources(analysis: BeeMoveAnalysis) -> None:
             b.metric("Baseline MAE", f"{metrics['baseline_mae_days']} days")
             c.metric("Training observations", f"{metrics['training_rows']:,}")
         sources = [
-            ("GeoAdmin Search", "Place and postcode suggestions", "https://docs.geo.admin.ch/access-data/search.html"),
-            ("GeoAdmin Height", "Terrain elevation", "https://docs.geo.admin.ch/access-data/get-point-height.html"),
-            ("GeoAdmin Identify", "Origin and destination canton", "https://docs.geo.admin.ch/access-data/identify-features.html"),
-            ("MeteoSwiss Local Forecast", "Bee-flight weather", "https://opendatadocs.meteoswiss.ch/e-forecast-data/e4-local-forecast-data"),
-            ("MeteoSwiss Spatial Climate Normals", "Typical 1991–2020 climate during the planned stay", "https://opendatadocs.meteoswiss.ch/c-climate-data/c7-spatial-climate-normals"),
-            ("MeteoSwiss Phenology", "ML training observations", "https://opendatadocs.meteoswiss.ch/a-data-groundbased/a9-phenological-observations"),
-            ("MeteoSwiss Pollen", "Regional context only", "https://opendatadocs.meteoswiss.ch/a-data-groundbased/a7-pollen-stations"),
-            ("Agricultural land use", "Annual parcels used by the app's forage heuristic", "https://opendata.swiss/en/dataset/landwirtschaftliche-nutzungsflachen-schweiz"),
-            ("FOEN–WSL Habitat Map v1.2", "Official habitat context on the map; not converted into nectar or score", "https://opendata.swiss/en/dataset/lebensraumkarte-der-schweiz"),
-            ("swisstopo Vector Tiles", "Official map", "https://docs.geo.admin.ch/visualize-data/vector-tiles.html"),
+            (
+                "GeoAdmin Search",
+                "Place and postcode suggestions",
+                "https://docs.geo.admin.ch/access-data/search.html",
+            ),
+            (
+                "GeoAdmin Height",
+                "Terrain elevation",
+                "https://docs.geo.admin.ch/access-data/get-point-height.html",
+            ),
+            (
+                "GeoAdmin Identify",
+                "Origin and destination canton",
+                "https://docs.geo.admin.ch/access-data/identify-features.html",
+            ),
+            (
+                "MeteoSwiss Local Forecast",
+                "Bee-flight weather",
+                "https://opendatadocs.meteoswiss.ch/e-forecast-data/e4-local-forecast-data",
+            ),
+            (
+                "MeteoSwiss Spatial Climate Normals",
+                "Typical 1991–2020 climate during the planned stay",
+                "https://opendatadocs.meteoswiss.ch/c-climate-data/c7-spatial-climate-normals",
+            ),
+            (
+                "MeteoSwiss Phenology",
+                "ML training observations",
+                "https://opendatadocs.meteoswiss.ch/a-data-groundbased/a9-phenological-observations",
+            ),
+            (
+                "MeteoSwiss Pollen",
+                "Regional context only",
+                "https://opendatadocs.meteoswiss.ch/a-data-groundbased/a7-pollen-stations",
+            ),
+            (
+                "Agricultural land use",
+                "Annual parcels used by the app's forage heuristic",
+                "https://opendata.swiss/en/dataset/landwirtschaftliche-nutzungsflachen-schweiz",
+            ),
+            (
+                "FOEN–WSL Habitat Map v1.2",
+                "Official habitat context on the map; not converted into nectar or score",
+                "https://opendata.swiss/en/dataset/lebensraumkarte-der-schweiz",
+            ),
+            (
+                "swisstopo Vector Tiles",
+                "Official map",
+                "https://docs.geo.admin.ch/visualize-data/vector-tiles.html",
+            ),
             (
                 "BLV",
                 "Federal stock-control form and movement guidance",
@@ -1009,18 +1214,28 @@ def _method_and_sources(analysis: BeeMoveAnalysis) -> None:
                     "fr", compliance.LAND_AGREEMENT_SOURCE_URL
                 ),
             ),
-            ("openrouteservice / HeiGIT", "Optional road distance", "https://giscience.github.io/openrouteservice/api-reference/endpoints/directions/"),
+            (
+                "openrouteservice / HeiGIT",
+                "Optional road distance",
+                "https://giscience.github.io/openrouteservice/api-reference/endpoints/directions/",
+            ),
         ]
         st.dataframe(
             pd.DataFrame(sources, columns=["Source", "Contribution", "Official link"]),
-            hide_index=True, width="stretch",
+            hide_index=True,
+            width="stretch",
             column_config={"Official link": st.column_config.LinkColumn()},
         )
         st.warning(
             "A high regional index is not proof of current nectar, flowering on a specific parcel, land permission or legal clearance. Check the exact site and competent authorities."
         )
+        st.caption(
+            "The flowering model does not use current-season weather, so it cannot directly "
+            "capture this year's weather-driven shifts. Agricultural coverage and update years "
+            "can differ between cantons. Missing evidence is not a low suitability score."
+        )
         st.markdown(
-            '<p class="source-note">Official BLV templates: German downloaded 22/09/2026; French and Italian downloaded 29/09/2026. BienenSchweiz German sample agreement downloaded 22/09/2026. Climate-normal source verified 30/09/2026; other online sources reverified 29/09/2026. Source: MeteoSwiss for MeteoSwiss data.</p>',
+            '<p class="source-note">Original BLV templates and BienenSchweiz agreement compared with official downloads on 07/10/2026. Climate-normal source update rechecked on 07/10/2026: bundled snapshot remains current. Source pages reviewed on 07/10/2026; temporary restrictions must be checked before each move. Source: MeteoSwiss for MeteoSwiss data.</p>',
             unsafe_allow_html=True,
         )
 
@@ -1059,13 +1274,15 @@ def _candidate_summary(candidate: dict) -> str:
     dates = (
         f"{_format_display_date(period['from'])} to "
         f"{_format_display_date(period['to'])}"
-        if period else "not available"
+        if period
+        else "not available"
     )
     route = candidate.get("route")
     distance = (
         f"Road route to the nearest routable road: {route['distance_km']} km, "
         f"{route['duration_minutes']} min"
-        if route else "Distance shown is direct (Haversine)"
+        if route
+        else "Distance shown is direct (Haversine)"
     )
     flowering_score = candidate.get("flowering", {}).get("score")
     low_signal = (
@@ -1101,9 +1318,9 @@ def _missing_evidence(candidate: dict, result: dict) -> list[str]:
     missing = []
     if not candidate.get("flowering", {}).get("available"):
         missing.append("flowering evidence was unavailable")
-    if (
-        result.get("forecast_lead_days") is not None
-        and not candidate.get("weather", {}).get("days")
+    if result.get("forecast_lead_days") is not None and not any(
+        day.get("flight_score") is not None
+        for day in candidate.get("weather", {}).get("days", [])
     ):
         missing.append("weather was unavailable inside the current forecast horizon")
     if not candidate.get("landscape", {}).get("available"):
@@ -1139,7 +1356,9 @@ def _format_display_date(value) -> str:
     if value in (None, ""):
         return "not available"
     try:
-        return pd.to_datetime(value).strftime("%d/%m/%Y")
+        # Already-European dates must not be reinterpreted as month/day.
+        date_format = "%d/%m/%Y" if isinstance(value, str) and "/" in value else None
+        return pd.to_datetime(value, format=date_format).strftime("%d/%m/%Y")
     except (TypeError, ValueError):
         return str(value)
 

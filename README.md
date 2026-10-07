@@ -73,6 +73,9 @@ Without a key, the app clearly uses direct Haversine distance.
 4. Compare regional candidates. These are representative MeteoSwiss
    place/postcode points, not approved parcels. The searched area is always
    retained as a benchmark and is shown at 0 km.
+   By default, up to eight reference points are evaluated, spread by distance
+   across the radius and deduplicated by place name. The shortlist is the best
+   among this sample, not an exhaustive assessment of every possible location.
 5. Inspect two decision horizons separately. Site suitability uses flowering
    and mapped forage across the complete planned stay. Short-term bee-flight
    conditions use up to seven available days from MeteoSwiss's current
@@ -80,8 +83,8 @@ Without a key, the app clearly uses direct Haversine distance.
    1991–2020 climate normals describe typical temperature, precipitation and
    relative sunshine for the selected calendar period, and are labelled as
    historical context rather than a forecast. Map switches show the search
-   radius, recommended candidates, nearest phenology station, agricultural
-   forage centroids, FOEN–WSL habitat context and nearest pollen station. The
+   radius, recommended candidates, nearest phenology station, representative
+   agricultural points, FOEN–WSL habitat context and nearest pollen station. The
    denser context layers start hidden to keep the map readable.
 6. If arrival lies beyond the live forecast, the regional index remains
    comparable and the user is told to return within nine days of the move to
@@ -117,6 +120,9 @@ order and dependent contract fields before generation.
 Personal and property details remain in the current Streamlit session for
 document generation. They are not written to the repository or sent to the
 public-data APIs used for the recommendation.
+The planned colony count carries into the movement form and remains editable.
+Edited enquiry text is used by the email link; regenerating documents resets
+the enquiry to the current form details.
 
 Dates up to one year ahead can be planned. Historical observations and climate
 normals describe seasonal suitability, but the app never presents them as a
@@ -126,12 +132,15 @@ weather forecast for a future date.
 
 | Component | Weight | Inputs |
 |---|---:|---|
-| Flowering and mapped forage | 75% | 65% modelled flowering timing across the stay + 35% mapped agricultural-forage abundance |
+| Flowering and mapped forage | 75% | 65% modelled flowering timing across the stay + 35% agricultural score (80% weighted abundance + 20% category diversity) |
 | Continuity | 25% | 70% stable flowering across the stay + 30% mapped forage-category diversity |
 
 The resulting effective contributions are 48.75% flowering timing, 26.25%
-mapped agricultural forage, 17.5% flowering stability and 7.5% mapped category
-diversity. All inputs are bounded to 0–100 before weighting. A result is ranked
+mapped agricultural score, and 25% continuity. Expanded fully, they are 48.75%
+flowering timing, 21% mapped abundance, 17.5% flowering stability and 12.75%
+category diversity. Diversity enters both agricultural context and continuity;
+these are the combined weights, not four independently validated measures.
+All inputs are bounded to 0–100 before weighting. A result is ranked
 only when both flowering and agricultural-land evidence are available; missing
 evidence is not silently replaced or reweighted.
 
@@ -159,8 +168,13 @@ for the colony. The search radius is only a filter.
 
 The agricultural source supplies parcel area and land-use labels, not nectar
 yield. Category coefficients, 1/2/3 km distance rings and saturation thresholds
-are documented prototype assumptions. Pale-green map dots are parcel centroids,
+are documented prototype assumptions. Pale-green map dots are representative
+points on locally clipped parcels,
 not bees, pollen counts, flowering observations or reconstructed boundaries.
+Shapely clips official LV95 Polygon/MultiPolygon records to the 1/2/3 km
+rings. Declared crop area is allocated proportionally to the geometry inside
+each ring, so disconnected or large parcels cannot contribute distant fields.
+This single geometry dependency avoids handwritten polygon algorithms.
 
 If flowering or agricultural evidence fails, the interface marks the result as
 partial and does not present a comparable regional index.
@@ -172,6 +186,11 @@ The “best period” is a separate three-day window inside the available live
 forecast. It combines 55% bee-flight weather and 45% modelled flowering to help
 time the move. It neither changes the regional index nor proves that conditions
 will remain suitable for the colony's complete stay.
+Only consecutive forecast dates form a window; fewer than three available
+consecutive days produce an explicitly shorter window. Missing hourly weather
+inputs are not substituted with calm wind or dry conditions.
+Charts keep actual date values in chronological order and format axes and
+tooltips as DD/MM/YYYY, including stays crossing a month or year boundary.
 
 ## Limits and correct interpretation
 
@@ -184,6 +203,9 @@ will remain suitable for the colony's complete stay.
 - **Agricultural land is a proxy:** the map does not cover every garden, urban
   plant, forest resource or small wild-flower patch and does not say whether a
   mapped crop is accessible, flowering or treated at the relevant moment.
+  Coverage and publication years can differ between cantons. Incomplete OGC
+  pagination does not produce a comparable index, and resources outside the
+  3 km forage radius do not increase abundance or diversity.
 - **Forecast horizon is short:** the interface shows up to seven available days
   from a MeteoSwiss source horizon of up to nine full days. Later parts of the
   stay use seasonal flowering estimates and climate context, not invented daily
@@ -225,10 +247,22 @@ python -m scripts.train_flowering_model
 ```
 
 The output estimates seasonal timing, not field-level flowering or nectar.
+The model does not use current-season weather inputs, so it cannot directly
+capture the selected year's weather-driven shifts in flowering.
+If both GeoAdmin height and MeteoSwiss point-height metadata are unavailable,
+the model uses 600 m as a last-resort prototype imputation. This is not an
+observed elevation; the result remains flagged as missing elevation context.
+Displayed date ranges are the 10th–90th percentiles across individual trees,
+not calibrated confidence intervals or guaranteed flowering windows.
 The general signal is limited to phenological species with a documented nectar
 or pollen role; wind-pollinated birch and cocksfoot are not treated as forage.
 The validation is chronological rather than a fully independent spatial field
 trial, so the model must remain a prototype planning signal.
+If the model file is missing or prediction fails, the observational fallback uses three nearby
+stations, current-season flowering dates when present, otherwise the median
+of the last ten valid observations per parameter. It is a general phenological
+signal: it does not apply the model's bee-species or forage-category selection.
+The interface identifies this fallback instead of presenting it as an ML result.
 
 ## Data sources and source documents
 
@@ -257,18 +291,24 @@ trial, so the model must remain a prototype planning signal.
 | [openrouteservice / HeiGIT](https://giscience.github.io/openrouteservice/api-reference/endpoints/directions/) | Optional road route through the hosted `api.heigit.org` endpoint |
 
 The 26 official cantonal entry points and the encoded local differences were
-checked on 28 September 2026 and are listed directly in
+reviewed on 7 October 2026 and are listed directly in
 `services/compliance.py`. Important differences include advance-notice periods
 in Basel-Landschaft, Fribourg and Graubünden, the permit regime in Glarus, the
 internal-canton exception in Neuchâtel, and clearance requirements in Ticino.
 Temporary restriction zones can change at any time, so the app always links to
 the deciding official source instead of claiming automatic legal clearance.
+The Graubünden checklist uses the accessible cantonal accompanying document
+(three working days, not the previously encoded ten days). Zug's webpage still
+states a ten-working-day registration deadline, conflicting with the federal
+three-working-day rule; the app explicitly flags this and follows the shorter
+federal deadline pending clarification by the authority.
 
 The three BLV official language forms and the German BienenSchweiz sample
 agreement are bundled unchanged in `static/forms/` so downloads remain
 reliable. The German files were downloaded on 22 September 2026; the French
 and Italian BLV files were downloaded from the official pages on 29 September
-2026. The online sources were reverified on 29 September 2026. The app only
+2026. All four bundled templates were compared byte for byte with the official
+downloads on 7 October 2026 and matched. The app only
 inserts user data into copies; it does not alter the source clauses or create
 an authorisation. No official Swiss Italian or English site-agreement template,
 and no official English BLV stock-control template, was found; the app does not
@@ -308,6 +348,14 @@ static/forms/                  unmodified official source templates
 tests/                         scoring, sources, documents and compliance
 ```
 
+Settings live in `config.py`; `.env.example` mirrors the default eight-candidate
+limit. `.env` or environment variables can override runtime settings without
+changing scientific weights. HTTP GET responses have a one-hour cache by
+default, so source timestamps indicate the data actually used, not a guarantee
+of an immediate refresh on every click. GeoAdmin autocomplete bypasses this cache.
+MapLibre 5.24.0 is retained because it was tested inside Streamlit's iframe;
+the prior v6 worker-loading issue is documented beside the embedded script.
+
 ## Tests
 
 ```bash
@@ -320,22 +368,49 @@ control, model inference, all 26 official cantonal sources and key local
 differences, multilingual request drafts, and preservation of the original
 PDF/Word source files and structures while filling copies.
 
+Verification on 7 October 2026: 827 automated tests passed, including all 676
+origin/destination canton pairs, the document workflow for each of the 26
+cantons, and every declared search/form selector value. Separate live checks
+covered 26 postcodes, 26 place-name searches and 26 road routes. Browser checks
+covered the map switches/category filters and desktop/mobile layout; all pages
+of the three language stock-control copies and the site agreement were rendered
+and inspected. The climate-normal STAC item still reported the same 30 June
+2026 update as the bundled snapshot.
+
+These are defined test cases, not every possible location or combination.
+Seven returned areas lacked usable agricultural evidence and correctly remained
+non-comparable. The Basel-Landschaft source blocked automated HTTP requests
+with 403; its published guidance was reviewed through the official indexed page,
+not treated as a successful live fetch. Temporary orders and actual inspector
+approval remain checks for the beekeeper before each move.
+
 ## Course submission checklist
 
-- Replace the five placeholders in `CONTRIBUTIONS.md` with the real work.
-- Review `AI_ASSISTANCE.md`, retain the relevant prompts and include Codex in
+- Complete the five members' actual roles in `CONTRIBUTIONS.md`; no work is
+  attributed automatically.
+- Review `AI_ASSISTANCE.md`, retain relevant prompts and include ChatGPT and Codex in
   the declaration of aids and the video reflection.
 - Include the bundled official declaration of authorship with the submission;
   its text states that submission itself confirms the declaration.
 - Demonstrate the working app, interaction, visualisations and ML model in a
   human-narrated video of no more than four minutes.
 - Upload the actual deliverables, not only external links.
+- The supplied assignment sets the Canvas deadline at 10 December 2026,
+  23:59, and requires the video/Q&A session on 11 December. Verify later course
+  announcements before submission.
 
 Source attribution for MeteoSwiss data: **Source: MeteoSwiss**.
 
 ## AI assistance
 
-OpenAI Codex supported code drafting, review, testing and documentation. The
-scope, representative prompts, human verification responsibilities and a
-report-ready reference are recorded in [`AI_ASSISTANCE.md`](AI_ASSISTANCE.md).
+ChatGPT supported early project discussions, prototype work and proposal wording;
+Codex supported code generation, revision, testing and documentation. Their
+scope, genuine prompt excerpts, human verification responsibilities and
+provisional tool references are recorded in [`AI_ASSISTANCE.md`](AI_ASSISTANCE.md).
 AI was used as an aid, not as a source for scientific or regulatory claims.
+The supplied project slides require source-code attribution when AI generates
+code, plus the video's list of aids and reflection. The AI record is a working
+disclosure, not confirmation of final academic compliance: the group must
+review the code, record its real contributions and complete verified model/version
+details requested by the tutor. Tool names and access dates are not model releases;
+missing version information is disclosed rather than invented.

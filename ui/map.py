@@ -1,7 +1,7 @@
 """MapLibre map embedded in Streamlit with the official swisstopo style.
 
-AI assistance: OpenAI Codex supported drafting and review. See
-``AI_ASSISTANCE.md`` for scope, prompts and the full citation.
+AI-assisted code generation and revision: OpenAI Codex (OpenAI, n.d.-b).
+See ``AI_ASSISTANCE.md`` for scope, prompts and references.
 """
 
 from __future__ import annotations
@@ -9,7 +9,9 @@ from __future__ import annotations
 import json
 import math
 
-STYLE_URL = "https://vectortiles.geo.admin.ch/styles/ch.swisstopo.lightbasemap.vt/style.json"
+STYLE_URL = (
+    "https://vectortiles.geo.admin.ch/styles/ch.swisstopo.lightbasemap.vt/style.json"
+)
 HABITAT_WMS = (
     "https://wms.geo.admin.ch/?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap"
     "&FORMAT=image/png&TRANSPARENT=true&LAYERS=ch.bafu.lebensraumkarte-schweiz"
@@ -34,7 +36,10 @@ def map_html(result: dict, selected_name: str | None = None) -> str:
                     "score": candidate["score"],
                     "selected": candidate["name"] == selected_name,
                 },
-                "geometry": {"type": "Point", "coordinates": [candidate["lon"], candidate["lat"]]},
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [candidate["lon"], candidate["lat"]],
+                },
             }
         )
     origin_feature = {
@@ -96,14 +101,16 @@ def map_html(result: dict, selected_name: str | None = None) -> str:
             "candidates": {"type": "FeatureCollection", "features": candidates},
             "radius": circle,
             "forage": {"type": "FeatureCollection", "features": forage},
-            "forageCategories": sorted({item["properties"]["category"] for item in forage}),
+            "forageCategories": sorted(
+                {item["properties"]["category"] for item in forage}
+            ),
             "phenology": {"type": "FeatureCollection", "features": phenology_features},
             "pollen": {"type": "FeatureCollection", "features": pollen_features},
         }
-    )
-    # Keep the latest v5 UMD build here. MapLibre v6 is ESM-only and its worker
-    # cannot start inside Streamlit's iframe without self-hosted worker modules
-    # or a custom frontend component, neither of which is justified for this map.
+    ).replace("<", "\\u003c")
+    # Keep the tested v5 UMD build. Our v6 trial failed at worker loading inside
+    # the Streamlit iframe; migration would need separately tested module/worker
+    # handling. This is a compatibility choice, not a claim that v5 is the newest.
     return f"""
 <!doctype html><html><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -121,7 +128,7 @@ html,body,#map{{height:100%;margin:0}}
 </head><body><div id="map"></div>
 <script>
 const data={payload};
-const map=new maplibregl.Map({{container:'map',style:'{STYLE_URL}',center:[{origin['lon']},{origin['lat']}],zoom:8}});
+const map=new maplibregl.Map({{container:'map',style:'{STYLE_URL}',center:[{origin["lon"]},{origin["lat"]}],zoom:8}});
 map.addControl(new maplibregl.NavigationControl(),'top-right');
 class LayerControl {{
   onAdd(map) {{
@@ -175,7 +182,19 @@ map.on('load',()=>{{
   map.addLayer({{id:'candidates',type:'circle',source:'candidates',paint:{{'circle-radius':['case',['get','selected'],9,7],'circle-color':['case',['get','selected'],'#f2b705','#2d8a52'],'circle-stroke-color':'#ffffff','circle-stroke-width':2}}}});
   map.addSource('origin',{{type:'geojson',data:data.origin}});
   map.addLayer({{id:'origin',type:'circle',source:'origin',paint:{{'circle-radius':7,'circle-color':'#111111','circle-stroke-color':'#ffffff','circle-stroke-width':2}}}});
-  for (const layer of ['origin','candidates','phenology','pollen','forage']) map.on('click',layer,e=>{{const p=e.features[0].properties; new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`<b>${{p.name}}</b>${{p.score?`<br>Regional index ${{p.score}}/100`:''}}${{p.detail?`<br>${{p.detail}}`:''}}${{p.category?`<br>${{p.category}}`:''}}`).addTo(map)}});
+  for (const layer of ['origin','candidates','phenology','pollen','forage']) map.on('click',layer,e=>{{
+    const p=e.features[0].properties;
+    const content=document.createElement('div');
+    const title=document.createElement('b'); title.textContent=p.name; content.appendChild(title);
+    for (const text of [p.score!=null?`Regional index ${{p.score}}/100`:null,p.detail,p.category]) {{
+      if (text) {{const row=document.createElement('div'); row.textContent=text; content.appendChild(row);}}
+    }}
+    new maplibregl.Popup().setLngLat(e.lngLat).setDOMContent(content).addTo(map);
+  }});
+  // Fit the selected radius even for small searches; a fixed zoom hid that scale.
+  const bounds=new maplibregl.LngLatBounds();
+  for (const coordinate of data.radius.geometry.coordinates[0]) bounds.extend(coordinate);
+  map.fitBounds(bounds,{{padding:35,maxZoom:13,duration:0}});
   // Add the control only after every layer exists, so its switches always
   // refer to a valid MapLibre layer.
   map.addControl(new LayerControl(),'top-left');
@@ -183,7 +202,9 @@ map.on('load',()=>{{
 </script></body></html>"""
 
 
-def _circle(lat: float, lon: float, radius_km: float, points: int = 72) -> list[list[float]]:
+def _circle(
+    lat: float, lon: float, radius_km: float, points: int = 72
+) -> list[list[float]]:
     coordinates = []
     for index in range(points + 1):
         angle = 2 * math.pi * index / points

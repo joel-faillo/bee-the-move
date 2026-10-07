@@ -5,8 +5,8 @@ only requested points and derives flight suitability from hourly temperature,
 rain, wind, gusts and global radiation. Radiation avoids double-counting
 correlated sunshine and cloud information.
 
-AI assistance: OpenAI Codex supported drafting and review. See
-``AI_ASSISTANCE.md`` for scope, prompts and the full citation.
+AI-assisted code generation and revision: OpenAI Codex (OpenAI, n.d.-b).
+See ``AI_ASSISTANCE.md`` for scope, prompts and references.
 """
 
 from __future__ import annotations
@@ -55,6 +55,11 @@ class MeteoSwissForecastService:
     def candidates(
         self, lat: float, lon: float, radius_km: float, limit: int
     ) -> list[ForecastPoint]:
+        """Sample representative place points by distance, not every Swiss site.
+
+        Keep the closest reference and spread the remaining capped sample across
+        the radius. The three displayed results are best only among this sample.
+        """
         text = self.http.get_text(POINTS_URL, encoding="latin-1")
         points: list[ForecastPoint] = []
         for row in csv.DictReader(io.StringIO(text), delimiter=";"):
@@ -136,18 +141,28 @@ class MeteoSwissForecastService:
     def _summarise_day(day: str, hours: list[dict]) -> dict:
         # Radiation identifies usable daylight across seasons better than a
         # fixed clock window.
-        daylight = [hour for hour in hours if (hour.get("radiation_wm2") or 0) >= 20]
+        # Missing precipitation is not dry weather, and missing wind is not calm.
+        # Only complete daylight hours can support the displayed flight assessment.
+        fields = ("temperature", "rain_mm", "wind_kmh", "gust_kmh", "radiation_wm2")
+        daylight = [
+            hour
+            for hour in hours
+            if all(hour.get(field) is not None for field in fields)
+            and hour["radiation_wm2"] >= 20
+        ]
         scored = [_flight_hour_score(hour) for hour in daylight]
         return {
             "date": day,
             "temperature": _average(hour.get("temperature") for hour in daylight),
-            "rain_mm": round(sum(hour.get("rain_mm") or 0 for hour in daylight), 1),
+            "rain_mm": round(sum(hour["rain_mm"] for hour in daylight), 1)
+            if daylight
+            else None,
             "wind_kmh": _average(hour.get("wind_kmh") for hour in daylight),
             "gust_kmh": _average(hour.get("gust_kmh") for hour in daylight),
             "radiation_wm2": _average(hour.get("radiation_wm2") for hour in daylight),
             "flight_hours": len(daylight),
             "favourable_hours": sum(score >= 60 for score in scored),
-            "flight_score": round(mean(scored), 1) if scored else 0,
+            "flight_score": round(mean(scored), 1) if scored else None,
         }
 
     def _latest_populated_item(self) -> dict:

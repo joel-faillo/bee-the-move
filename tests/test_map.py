@@ -1,3 +1,8 @@
+"""AI-assisted test generation and revision: OpenAI Codex (OpenAI, n.d.-b).
+
+See ``AI_ASSISTANCE.md`` for scope, prompts and references.
+"""
+
 from ui.map import map_html
 from services.landscape import FORAGE_CATEGORIES
 
@@ -42,7 +47,14 @@ def test_map_explains_and_controls_context_layers():
     assert "All forage categories" in html
     for category in FORAGE_CATEGORIES:
         assert category in html
-    for layer in ("radius-line,radius-fill", "candidates", "phenology", "habitat-map", "pollen", "forage"):
+    for layer in (
+        "radius-line,radius-fill",
+        "candidates",
+        "phenology",
+        "habitat-map",
+        "pollen",
+        "forage",
+    ):
         assert f'data-layer="{layer}"' in html
     assert 'class="layer-options" hidden' in html
     assert 'aria-expanded="false"' in html
@@ -69,3 +81,16 @@ def test_origin_is_not_duplicated_as_a_candidate_marker():
     html = map_html(result, "St. Gallen")
 
     assert '"candidates": {"type": "FeatureCollection", "features": []}' in html
+
+
+def test_map_payload_cannot_close_script_and_zero_score_is_visible():
+    result = {
+        "origin": {"name": "</script><b>name</b>", "lat": 47.4, "lon": 9.3},
+        "radius_km": 2,
+        "results": [],
+    }
+    html = map_html(result)
+    assert "</script><b>name</b>" not in html
+    assert "setDOMContent(content)" in html
+    assert "p.score!=null" in html
+    assert "map.fitBounds" in html

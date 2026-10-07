@@ -4,8 +4,8 @@ Service modules fetch and normalise one source each; ``beescore.py`` contains
 the pure scoring rules. This separation keeps every score component inspectable
 and testable.
 
-AI assistance: OpenAI Codex supported drafting and review. See
-``AI_ASSISTANCE.md`` for scope, prompts and the full citation.
+AI-assisted code generation and revision: OpenAI Codex (OpenAI, n.d.-b).
+See ``AI_ASSISTANCE.md`` for scope, prompts and references.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
 
 from beescore import (
+    WEIGHTS,
     best_period,
     calculate,
     continuity_score,
@@ -104,11 +105,7 @@ class BeeMoveAnalysis:
         )
         forecast_meta = {"available": bool(forecasts), **forecast_meta}
         forecast_dates = sorted(
-            {
-                day["date"]
-                for point_days in forecasts.values()
-                for day in point_days
-            }
+            {day["date"] for point_days in forecasts.values() for day in point_days}
         )
         today = date.today()
         selected = date.fromisoformat(analysis_date) if analysis_date else today
@@ -167,7 +164,7 @@ class BeeMoveAnalysis:
                 height_source = "meteoswiss_metadata"
             # The trained project model is the primary seasonal signal. Live
             # station observations remain an explicit fallback if the model
-            # artifact has not yet been built or cannot be loaded.
+            # artifact is missing or a model prediction cannot be produced.
             flowering = (
                 self._safe(
                     lambda: self.flowering_model.predict_signal(
@@ -204,8 +201,7 @@ class BeeMoveAnalysis:
                     "top_resources": [],
                 },
             )
-            weather = weather_score(days)
-            weather_component = weather if days else None
+            weather_component = weather_score(days)
             forage = forage_score(flowering.get("score", 0), landscape.get("score", 0))
             continuity = continuity_score(
                 flowering.get("daily", []), landscape.get("diversity_score", 0)
@@ -241,7 +237,8 @@ class BeeMoveAnalysis:
                 "name": origin["name"] if is_origin_area else point.name,
                 "postal_code": (
                     origin.get("postal_code") or point.postal_code
-                    if is_origin_area else point.postal_code
+                    if is_origin_area
+                    else point.postal_code
                 ),
                 "lat": evaluation_lat,
                 "lon": evaluation_lon,
@@ -254,7 +251,7 @@ class BeeMoveAnalysis:
                 "route": None,
                 "height_m": height,
                 "height_source": height_source,
-                "weather": {"score": weather_component, "days": days[:7]},
+                "weather": {"score": weather_component, "days": days},
                 "flowering": flowering,
                 "landscape": landscape,
                 "climate_normals": climate,
@@ -264,8 +261,8 @@ class BeeMoveAnalysis:
             }
 
         with ThreadPoolExecutor(max_workers=min(8, len(points) + 1)) as executor:
-            # One compact set of centroids powers the useful Meadows/Pastures
-            # map filters without sending hundreds of heavy polygons.
+            # Locally clipped parcel points power the category map filters
+            # without sending heavy Polygon/MultiPolygon geometries to the browser.
             forage_map_future = executor.submit(
                 self.landscape.map_points, origin["lat"], origin["lon"]
             )
@@ -278,9 +275,7 @@ class BeeMoveAnalysis:
             # must not reorder biological suitability; access still needs a
             # parcel-level check by the beekeeper.
             route_targets = [
-                candidate
-                for candidate in candidates
-                if not candidate["is_origin_area"]
+                candidate for candidate in candidates if not candidate["is_origin_area"]
             ]
             for candidate in route_targets:
                 route = self._safe(
@@ -295,7 +290,7 @@ class BeeMoveAnalysis:
                     candidate["components"]["logistics"] = distance_score(
                         route["distance_km"]
                     )
-            candidates.sort(key=_ranking_key, reverse=True)
+            # Routes update logistics only; the existing biological order stays valid.
 
         # Elevation is an eligibility preference, not a hidden score bonus.
         # The searched place remains visible as a reference even if it falls
@@ -335,9 +330,8 @@ class BeeMoveAnalysis:
             "phenology_station": phenology_station,
             "forage_map": forage_map,
             "score_method": {
-                "forage": 75,
+                **WEIGHTS,
                 "flight_weather": 0,
-                "continuity": 25,
                 "logistics": 0,
             },
             "sources": {
@@ -369,6 +363,7 @@ class BeeMoveAnalysis:
 
     @staticmethod
     def _safe(operation, fallback):
+        """Keep source failures local; the caller exposes unavailable evidence."""
         try:
             return operation()
         except Exception:

@@ -5,9 +5,8 @@ requirements or procedures stated by an official cantonal source. The app
 does not grant a permit and cannot know temporary disease restriction zones;
 the beekeeper must open the linked source immediately before every move.
 
-AI assistance: OpenAI Codex helped structure and review this module on
-28 September 2026. The project team verified the encoded rules against the
-official links below and remains responsible for the submitted code.
+AI-assisted code generation and revision: OpenAI Codex (OpenAI, n.d.-b).
+See ``AI_ASSISTANCE.md`` for scope, prompts and references.
 """
 
 from __future__ import annotations
@@ -39,7 +38,7 @@ LAND_AGREEMENT_SOURCE_URLS = {
 }
 LAND_AGREEMENT_SOURCE_URL = LAND_AGREEMENT_SOURCE_URLS["de"]
 
-CHECKED_ON = "2026-09-28"
+CHECKED_ON = "2026-10-07"
 FEDERAL_MOVE_RULE = (
     "Before crossing an inspection district, notify the bee inspectors for "
     "both the old and new locations; mating units moved to mating stations are exempt."
@@ -60,134 +59,165 @@ def _rule(office: str, email: str, source_url: str, *notes: str) -> dict:
 # when the linked authority publishes a local requirement or implementation.
 CANTON_RULES = {
     "AG": _rule(
-        "Veterinärdienst Kanton Aargau", "veterinaerdienst@ag.ch",
+        "Veterinärdienst Kanton Aargau",
+        "veterinaerdienst@ag.ch",
         "https://www.ag.ch/de/themen/landwirtschaft-tiere/heim-und-nutztiere/tiergesundheit-und-tierseuchen/bienen",
         "Use the published inspection-circle contacts and check current restriction zones.",
     ),
     "AI": _rule(
-        "Veterinäramt beider Appenzell", "veterinaeramt@ar.ch",
+        "Veterinäramt beider Appenzell",
+        "veterinaeramt@ar.ch",
         "https://ar.ch/verwaltung/departement-gesundheit-und-soziales/veterinaeramt/bienen/",
         "Notify the inspectors for the old and new inspection districts before the move.",
     ),
     "AR": _rule(
-        "Veterinäramt beider Appenzell", "veterinaeramt@ar.ch",
+        "Veterinäramt beider Appenzell",
+        "veterinaeramt@ar.ch",
         "https://ar.ch/verwaltung/departement-gesundheit-und-soziales/veterinaeramt/bienen/",
         "Notify the inspectors for the old and new inspection districts before the move.",
     ),
     "BE": _rule(
-        "Amt für Veterinärwesen Kanton Bern", "info.avet@be.ch",
+        "Amt für Veterinärwesen Kanton Bern",
+        "info.avet@be.ch",
         "https://www.weu.be.ch/de/start/themen/veterinaerwesen/tierseuchen/bienenseuchen.html",
         "Check the current cantonal restriction-zone map before moving colonies.",
     ),
     "BL": _rule(
-        "Amt für Lebensmittelsicherheit und Veterinärwesen", "veterinaerdienst@bl.ch",
+        "Amt für Lebensmittelsicherheit und Veterinärwesen",
+        "veterinaerdienst@bl.ch",
         "https://www.baselland.ch/politik-und-behorden/direktionen/volkswirtschafts-und-gesundheitsdirektion/lebensmittelsicherheit-und-veterinarwesen/veterinaerwesen/test-tiergesundh",
         "Notify the inspectors for both locations at least two days in advance when crossing an inspection district.",
     ),
     "BS": _rule(
-        "Veterinäramt Kanton Basel-Stadt", "kanzlei.vetamt@bs.ch",
+        "Veterinäramt Kanton Basel-Stadt",
+        "kanzlei.vetamt@bs.ch",
         "https://www.bs.ch/gd/veterinaeramt/tiergesundheit/tierseuchen/bieneninspektorat",
-        "Contact the inspector early and wait for the official decision before moving.",
+        "Notify the cantonal bee inspector of every colony move, including moves within Basel-Stadt; confirm any required checks before moving.",
     ),
     "FR": _rule(
-        "Service de la sécurité alimentaire et des affaires vétérinaires", "saav-sa@fr.ch",
+        "Service de la sécurité alimentaire et des affaires vétérinaires",
+        "saav-sa@fr.ch",
         "https://www.fr.ch/energie-agriculture-et-environnement/agriculture-et-animaux-de-rente/sante-animale/ruchers",
         "Send the movement notice in writing at least ten days in advance.",
     ),
     "GE": _rule(
-        "Service de la consommation et des affaires vétérinaires", "scav@etat.ge.ch",
+        "Service de la consommation et des affaires vétérinaires",
+        "scav@etat.ge.ch",
         "https://www.ge.ch/actualite/beetraffic-application-qui-facilite-annonces-officielles-deplacement-abeilles-25-02-2020",
         "Use the cantonal BeeTraffic procedure and wait for confirmation or authorisation.",
     ),
     "GL": _rule(
-        "Amt für Lebensmittelsicherheit und Tiergesundheit GR/GL", "info@alt.gr.ch",
+        "Amt für Lebensmittelsicherheit und Tiergesundheit GR/GL",
+        "info@alt.gr.ch",
         "https://gesetze.gl.ch/api/de/versions/1571/pdf_file",
         "Seasonal migratory beekeeping requires a cantonal permit; Glarus also has protected native-bee areas.",
+        "Only the native dark Alpine bee may be kept in Glarus; other bee races may not be introduced. Confirm the permitted site and breed before planning a move.",
     ),
     "GR": _rule(
-        "Amt für Lebensmittelsicherheit und Tiergesundheit GR/GL", "info@alt.gr.ch",
-        "https://www.gr.ch/DE/institutionen/verwaltung/dvs/alt/aktuelles/tiergesundheit/bienenwesen/Seiten/Bienenwesen---was-ist-zui-beachten-beim-Verstellen-von-Bienenv%C3%B6lkern.aspx",
-        "Notify both inspectors in writing at least ten days in advance; arrivals from another canton may require a health confirmation.",
+        "Amt für Lebensmittelsicherheit und Tiergesundheit GR/GL",
+        "info@alt.gr.ch",
+        "https://www.gr.ch/DE/institutionen/verwaltung/dvs/alt/tiere/Documents/1828%20Bienenverkehr_de.pdf",
+        "Notify both inspectors before crossing an inspection district. The cantonal accompanying document must reach the competent inspector at least three working days before the move; arrivals from another canton require the origin inspector's signature.",
+        "The cantonal leaflet recommends avoiding moves during the main fire-blight period (usually April–June). Ask the plant-protection service about the current situation rather than assuming an old leaflet establishes today's restrictions.",
     ),
     "JU": _rule(
-        "Service de la consommation et des affaires vétérinaires", "secr.vet@jura.ch",
+        "Service de la consommation et des affaires vétérinaires",
+        "secr.vet@jura.ch",
         "https://www.jura.ch/fr/Autorites/Administration/DES/SCAV/Section-affaires-veterinaires/Apiculture/Apiculture.html",
         "Announce moves between inspection circles to the competent inspectors.",
     ),
     "LU": _rule(
-        "Veterinärdienst Kanton Luzern", "veterinaerdienst@lu.ch",
+        "Veterinärdienst Kanton Luzern",
+        "veterinaerdienst@lu.ch",
         "https://veterinaerdienst.lu.ch/tiergesundheit/tierseuchen/bekaempfung/bienenseuchen",
         "Notify the inspector when crossing an inspection district and check current restriction zones.",
     ),
     "NE": _rule(
-        "Service de la consommation et des affaires vétérinaires", "scav@ne.ch",
+        "Service de la consommation et des affaires vétérinaires",
+        "scav@ne.ch",
         "https://www.ne.ch/themes/economie-et-emploi/agriculture-et-viticulture/detenteurs-danimaux",
         "Moves between existing apiaries inside Neuchâtel need no notice, but must be recorded and checked against restriction zones.",
-        "For a move to another canton, notify both inspectors and wait for authorisation.",
+        "For a move to another canton, notify the competent destination inspector beforehand and confirm the applicable procedure.",
     ),
     "NW": _rule(
-        "Laboratorium der Urkantone", "sekretariat.kt@laburk.ch",
+        "Laboratorium der Urkantone",
+        "sekretariat.kt@laburk.ch",
         "https://www.ur.ch/unterinstanzen/978",
         "The shared veterinary authority applies the federal inspection-district rule; confirm the current inspector with Laburk.",
     ),
     "OW": _rule(
-        "Laboratorium der Urkantone", "sekretariat.kt@laburk.ch",
+        "Laboratorium der Urkantone",
+        "sekretariat.kt@laburk.ch",
         "https://www.ur.ch/unterinstanzen/978",
         "The shared veterinary authority applies the federal inspection-district rule; confirm the current inspector with Laburk.",
     ),
     "SG": _rule(
-        "Amt für Verbraucherschutz und Veterinärwesen", "info.avsv@sg.ch",
+        "Amt für Verbraucherschutz und Veterinärwesen",
+        "info.avsv@sg.ch",
         "https://www.sg.ch/umwelt-natur/veterinaerwesen/tiergesundheit/bienenkrankheiten.html",
-        "Notify both inspectors before crossing an inspection district; the canton supports BeeTraffic.",
+        "Before crossing an inspection district, notify both inspectors. The cantonal movement document must reach the destination inspector at least three working days before the move.",
     ),
     "SH": _rule(
-        "Veterinäramt Kanton Schaffhausen", "veterinaeramt@sh.ch",
+        "Veterinäramt Kanton Schaffhausen",
+        "veterinaeramt@sh.ch",
         "https://sh.ch/CMS/Webseite/Kanton-Schaffhausen/Beh-rde/Verwaltung/Departement-des-Innern/Veterin-ramt/Tierhalter/Bienen-1746130-DE.html",
         "For moves into or out of the canton, notify both inspectors in advance and check restriction zones.",
     ),
     "SO": _rule(
-        "Veterinärdienst Kanton Solothurn", "vetd@vd.so.ch",
+        "Veterinärdienst Kanton Solothurn",
+        "vetd@vd.so.ch",
         "https://wallierhof.so.ch/fachwissen-und-beratung/bienen/meldepflichten/",
         "Notify the inspectors for the old and new locations before crossing an inspection district.",
     ),
     "SZ": _rule(
-        "Laboratorium der Urkantone", "sekretariat.kt@laburk.ch",
+        "Laboratorium der Urkantone",
+        "sekretariat.kt@laburk.ch",
         "https://www.ur.ch/unterinstanzen/978",
         "The shared veterinary authority applies the federal inspection-district rule; confirm the current inspector with Laburk.",
     ),
     "TG": _rule(
-        "Veterinäramt Kanton Thurgau", "veterinaeramt@tg.ch",
+        "Veterinäramt Kanton Thurgau",
+        "veterinaeramt@tg.ch",
         "https://www.rechtsbuch.tg.ch/app/de/texts_of_law/819.11",
         "The cantonal bee-inspection service implements the federal rule; confirm the responsible district inspector before moving.",
     ),
     "TI": _rule(
-        "Ufficio del veterinario cantonale", "dss-uvc@ti.ch",
+        "Ufficio del veterinario cantonale",
+        "dss-uvc@ti.ch",
         "https://www4.ti.ch/dss/dsp/uvc/temi/tenuta-di-animali/api/identificazione-apiari-notifiche-e-spostamenti",
         "Notify both inspectors and obtain their clearance before crossing an inspection district.",
         "For arrivals from another canton, the origin inspector may need to certify the health status.",
+        "The destination site must have an identification plate and no more than 60 colonies. Recommended separation is 300 m for 1–10 colonies, 400 m for 11–30, and 500 m for 31–60.",
+        "Check municipal installation requirements. From May to August, arrange site checks at least every 15 days or appoint a local caretaker.",
     ),
     "UR": _rule(
-        "Laboratorium der Urkantone", "sekretariat.kt@laburk.ch",
+        "Laboratorium der Urkantone",
+        "sekretariat.kt@laburk.ch",
         "https://www.ur.ch/unterinstanzen/978",
         "The shared veterinary authority applies the federal inspection-district rule; confirm the current inspector with Laburk.",
     ),
     "VD": _rule(
-        "Direction générale de l'agriculture, de la viticulture et des affaires vétérinaires", "info.svet@vd.ch",
+        "Direction générale de l'agriculture, de la viticulture et des affaires vétérinaires",
+        "info.svet@vd.ch",
         "https://www.vd.ch/population/veterinaires-et-animaux/apiculture",
         "Notify the inspectors for both locations before crossing an inspection district.",
     ),
     "VS": _rule(
-        "Office vétérinaire cantonal", "ovet@admin.vs.ch",
+        "Office vétérinaire cantonal",
+        "ovet@admin.vs.ch",
         "https://geo.vs.ch/web/scav/veterinaire/abeille",
         "Notify before crossing an inspection district or canton, and check current disease and seasonal plant-health restrictions.",
+        "Do not move before the responsible bee inspector has validated the movement.",
     ),
     "ZG": _rule(
-        "Veterinärdienst Kanton Zug", "info.vetd@zg.ch",
+        "Veterinärdienst Kanton Zug",
+        "info.vetd@zg.ch",
         "https://zg.ch/de/natur-umwelt-tiere/veterinaerwesen/tiergesundheit/bieneninspektorat",
-        "Zug has one cantonal inspector; register a new apiary or change within ten working days and record every movement.",
+        "The Zug webpage still states ten working days for registering a new apiary, beekeeper change or closure, whereas the federal rule states three working days. Follow the shorter federal deadline and ask the veterinary service to clarify this discrepancy.",
     ),
     "ZH": _rule(
-        "Veterinäramt Kanton Zürich", "kanzlei@veta.zh.ch",
+        "Veterinäramt Kanton Zürich",
+        "kanzlei@veta.zh.ch",
         "https://www.zh.ch/de/umwelt-tiere/tiere/tierseuchen.html",
         "Notify both inspectors before crossing an inspection district or canton and check restriction zones.",
     ),
@@ -205,22 +235,22 @@ def cantonal_rule(canton_code: str | None) -> dict:
             "email": "",
             "source_url": VETERINARY_DIRECTORY_URL,
             "checked_on": CHECKED_ON,
-            "notes": ["Resolve the competent inspector from the official BLV directory."],
+            "notes": [
+                "Resolve the competent inspector from the official BLV directory."
+            ],
         }
     return {"canton": code, **rule}
 
 
-def veterinary_office(canton_code: str | None) -> dict:
-    """Backward-compatible alias used by the document and email workflow."""
-    return cantonal_rule(canton_code)
-
-
-def movement_steps(origin_canton: str | None, destination_canton: str | None) -> list[str]:
+def movement_steps(
+    origin_canton: str | None, destination_canton: str | None
+) -> list[str]:
     """Build a checklist from federal rules and the two relevant cantons."""
     origin = (origin_canton or "").upper()
     destination = (destination_canton or "").upper()
     steps = [
         "Confirm that the beekeeper and every apiary are registered and visibly identified.",
+        "Report a new apiary, a change of beekeeper or closure within three working days under the federal registration rule; this is separate from advance movement notification.",
         "Check current disease restriction zones at origin and destination immediately before moving.",
         "Record the move in the official colony stock-control record and retain it for three years.",
     ]
@@ -229,22 +259,38 @@ def movement_steps(origin_canton: str | None, destination_canton: str | None) ->
     elif destination == "NE":
         steps.insert(2, CANTON_RULES["NE"]["notes"][0])
     elif origin and destination:
-        steps.insert(2, "Confirm whether the move crosses an inspection district; if it does, the federal notification rule applies.")
+        steps.insert(
+            2,
+            "Confirm whether the move crosses an inspection district; if it does, the federal notification rule applies.",
+        )
     else:
-        steps.insert(2, "Resolve both cantons and the competent inspection districts before moving.")
+        steps.insert(
+            2,
+            "Resolve both cantons and the competent inspection districts before moving.",
+        )
 
     for code in dict.fromkeys((origin, destination)):
         for note in cantonal_rule(code)["notes"] if code else []:
+            if (
+                code == "NE"
+                and note == CANTON_RULES["NE"]["notes"][0]
+                and origin != destination
+            ):
+                continue
             if note not in steps:
                 steps.append(note)
-    steps.append("Open the linked cantonal source again on the day of planning; temporary orders can change without notice.")
+    steps.append(
+        "Open the linked cantonal source again on the day of planning; temporary orders can change without notice."
+    )
     return steps
 
 
 def notification_copy(data: dict, canton: str) -> tuple[str, str]:
     """Create a draft inquiry, never an official clearance or submission."""
     origin = _place_with_canton(data["origin_name"], data["origin_canton"])
-    destination = _place_with_canton(data["destination_name"], data["destination_canton"])
+    destination = _place_with_canton(
+        data["destination_name"], data["destination_canton"]
+    )
     common = {
         "beekeeper": data["beekeeper"],
         "beekeeper_number": data["beekeeper_number"] or "-",
@@ -259,7 +305,9 @@ def notification_copy(data: dict, canton: str) -> tuple[str, str]:
         "email": data["email"],
     }
     if canton in {"FR", "GE", "JU", "NE", "VD", "VS"}:
-        subject = f"Demande concernant un déplacement de colonies: {origin} – {destination}"
+        subject = (
+            f"Demande concernant un déplacement de colonies: {origin} – {destination}"
+        )
         body = (
             "Bonjour,\n\nJe vous prie de vérifier le déplacement prévu de colonies d'abeilles.\n\n"
             "Apiculteur/trice: {beekeeper}\nN° d'exploitation: {beekeeper_number}\n"

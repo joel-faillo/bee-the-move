@@ -1,8 +1,7 @@
 """Train and use the project's own flowering-date regression model.
 
-AI assistance citation: OpenAI Codex helped draft this module on 21 September
-2026 from the team's Bee the Move specification. The team must review this
-code and record its final use in the project video and list of aids.
+AI-assisted code generation and revision: OpenAI Codex (OpenAI, n.d.-b).
+See ``AI_ASSISTANCE.md`` for scope, prompts and references.
 
 The target is the observed day-of-year of MeteoSwiss's 50% flowering phase.
 The model never predicts nectar yield; it estimates seasonal timing only.
@@ -33,6 +32,7 @@ ITEMS_URL = f"https://data.geo.admin.ch/api/stac/v1/collections/{COLLECTION}/ite
 STATIONS_URL = "https://data.geo.admin.ch/ch.meteoschweiz.ogd-phenology/ogd-phenology_meta_stations.csv"
 PARAMETERS_URL = "https://data.geo.admin.ch/ch.meteoschweiz.ogd-phenology/ogd-phenology_meta_parameters.csv"
 FEATURES = ["parameter", "latitude", "longitude", "height_m", "year"]
+DEFAULT_HEIGHT_M = 600.0
 FORAGE_PHENOLOGY_PARAMETERS = {
     "Orchards and high-stem fruit trees": ("mmald65d", "mprua65d", "mpyrc65d"),
     "Meadows": ("mcarp65d", "mleuv65d", "mtaro65d"),
@@ -103,9 +103,7 @@ class FloweringModel:
         selected_parameters = FORAGE_PHENOLOGY_PARAMETERS.get(preferred_category)
         candidates = selected_parameters or BEE_RELEVANT_PARAMETERS
         parameter_names = [
-            parameter
-            for parameter in candidates
-            if parameter in self.parameters
+            parameter for parameter in candidates if parameter in self.parameters
         ]
         focus_applied = bool(selected_parameters and parameter_names)
         frame = pd.DataFrame(
@@ -114,7 +112,8 @@ class FloweringModel:
                     "parameter": parameter,
                     "latitude": lat,
                     "longitude": lon,
-                    "height_m": height_m or 600.0,
+                    # Last-resort prototype imputation, not a terrain observation.
+                    "height_m": DEFAULT_HEIGHT_M if height_m is None else height_m,
                     "year": year,
                 }
                 for year in years
@@ -129,6 +128,7 @@ class FloweringModel:
         )
         lower = np.quantile(tree_predictions, 0.1, axis=0)
         upper = np.quantile(tree_predictions, 0.9, axis=0)
+        # Tree dispersion is descriptive; it is not a calibrated confidence interval.
         predictions = [
             FloweringPrediction(
                 parameter=parameter,
@@ -152,7 +152,9 @@ class FloweringModel:
                 ),
                 reverse=True,
             )[:6]
-            daily.append({"date": value, "score": round(100 * sum(signals) / len(signals))})
+            daily.append(
+                {"date": value, "score": round(100 * sum(signals) / len(signals))}
+            )
 
         midpoint_date = date.fromisoformat(dates[len(dates) // 2])
         midpoint = midpoint_date.timetuple().tm_yday
@@ -171,7 +173,9 @@ class FloweringModel:
             "predictions": [
                 {
                     "species": item.species,
-                    "predicted_date": _date_from_day(midpoint_date.year, item.day_of_year),
+                    "predicted_date": _date_from_day(
+                        midpoint_date.year, item.day_of_year
+                    ),
                     "range_from": _date_from_day(midpoint_date.year, item.lower_day),
                     "range_to": _date_from_day(midpoint_date.year, item.upper_day),
                 }
@@ -224,8 +228,12 @@ def train_and_save(http: HttpClient, output_path: str | Path) -> dict:
     final_model = _pipeline()
     final_model.fit(frame[FEATURES], frame["day_of_year"])
     metrics = {
-        "model_mae_days": round(float(mean_absolute_error(test["day_of_year"], model_predictions)), 2),
-        "baseline_mae_days": round(float(mean_absolute_error(test["day_of_year"], baseline_predictions)), 2),
+        "model_mae_days": round(
+            float(mean_absolute_error(test["day_of_year"], model_predictions)), 2
+        ),
+        "baseline_mae_days": round(
+            float(mean_absolute_error(test["day_of_year"], baseline_predictions)), 2
+        ),
         "training_rows": int(len(frame)),
         "training_years": [int(frame["year"].min()), int(frame["year"].max())],
         "test_years": [int(test["year"].min()), int(test["year"].max())],
@@ -251,10 +259,16 @@ def train_and_save(http: HttpClient, output_path: str | Path) -> dict:
 
 
 def _pipeline() -> Pipeline:
+    # Keep preprocessing consistent with the bundled artifact. Changing even
+    # unnecessary-for-trees scaling requires retraining and renewed evaluation.
     prepare = ColumnTransformer(
         [
             ("species", OneHotEncoder(handle_unknown="ignore"), ["parameter"]),
-            ("numeric", StandardScaler(), ["latitude", "longitude", "height_m", "year"]),
+            (
+                "numeric",
+                StandardScaler(),
+                ["latitude", "longitude", "height_m", "year"],
+            ),
         ]
     )
     return Pipeline(
@@ -290,7 +304,10 @@ def _download_rows(http: HttpClient) -> tuple[list[dict], dict[str, str], str | 
 
     items = http.get_json(ITEMS_URL, params={"limit": 200}, cache=False)
     source_updated = max(
-        (item.get("properties", {}).get("updated", "") for item in items.get("features", [])),
+        (
+            item.get("properties", {}).get("updated", "")
+            for item in items.get("features", [])
+        ),
         default=None,
     )
     observations = []

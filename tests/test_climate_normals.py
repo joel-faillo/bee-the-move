@@ -1,3 +1,8 @@
+"""AI-assisted test generation and revision: OpenAI Codex (OpenAI, n.d.-b).
+
+See ``AI_ASSISTANCE.md`` for scope, prompts and references.
+"""
+
 from datetime import date
 
 import numpy as np
@@ -43,9 +48,9 @@ def test_summary_weights_monthly_normals_to_the_planned_stay():
 
 
 def test_bundled_official_snapshot_covers_a_swiss_grid_point():
-    result = ClimateNormalsService(
-        "data/climate_normals_1991_2020.npz"
-    ).summary(2_746_000, 1_255_000, "2027-04-15", "2027-05-12")
+    result = ClimateNormalsService("data/climate_normals_1991_2020.npz").summary(
+        2_746_000, 1_255_000, "2027-04-15", "2027-05-12"
+    )
 
     assert result["normal_period"] == "1991-2020"
     assert result["source_snapshot"] == "30/09/2026"

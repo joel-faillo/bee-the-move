@@ -1,7 +1,7 @@
 """GeoAdmin place search, terrain height, canton lookup and distance maths.
 
-AI assistance: OpenAI Codex supported drafting and review. See
-``AI_ASSISTANCE.md`` for scope, prompts and the full citation.
+AI-assisted code generation and revision: OpenAI Codex (OpenAI, n.d.-b).
+See ``AI_ASSISTANCE.md`` for scope, prompts and references.
 """
 
 from __future__ import annotations
@@ -101,7 +101,9 @@ class GeoAdminService:
                     "label": label,
                     "search_text": label,
                     "kind": "Postal code (CAP)" if origin == "zipcode" else "Place",
-                    "postal_code": label.split(" - ", 1)[0] if origin == "zipcode" else "",
+                    "postal_code": label.split(" - ", 1)[0]
+                    if origin == "zipcode"
+                    else "",
                     "lat": float(attrs["lat"]),
                     "lon": float(attrs["lon"]),
                 }

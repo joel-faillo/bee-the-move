@@ -4,8 +4,8 @@ The official 1991-2020 monthly grids describe typical temperature,
 precipitation and relative sunshine across Switzerland. They are historical
 reference values, never a forecast for the user's planned dates.
 
-AI assistance: OpenAI Codex supported drafting and review. See
-``AI_ASSISTANCE.md`` for scope, prompts and the full citation.
+AI-assisted code generation and revision: OpenAI Codex (OpenAI, n.d.-b).
+See ``AI_ASSISTANCE.md`` for scope, prompts and references.
 """
 
 from __future__ import annotations
@@ -60,7 +60,9 @@ class ClimateNormalsService:
         for month_start, days in month_spans:
             month_index = month_start.month - 1
             values = {
-                name: _nearest_value(grid, eastings, northings, month_index, easting, northing)
+                name: _nearest_value(
+                    grid, eastings, northings, month_index, easting, northing
+                )
                 for name, (grid, eastings, northings) in self._grids.items()
             }
             days_in_month = calendar.monthrange(month_start.year, month_start.month)[1]
@@ -106,7 +108,9 @@ class ClimateNormalsService:
             if self._grids is not None:
                 return
             if not self.data_path.exists():
-                raise RuntimeError("The bundled MeteoSwiss climate-normal snapshot is missing")
+                raise RuntimeError(
+                    "The bundled MeteoSwiss climate-normal snapshot is missing"
+                )
             with np.load(self.data_path) as source:
                 scale = float(source["scale"])
                 eastings = source["eastings"].astype(float)
@@ -149,6 +153,8 @@ def _month_spans(start: date, end: date) -> list[tuple[date, int]]:
             else date(cursor.year, cursor.month + 1, 1)
         )
         segment_end = min(end, next_month - timedelta(days=1))
-        spans.append((date(cursor.year, cursor.month, 1), (segment_end - cursor).days + 1))
+        spans.append(
+            (date(cursor.year, cursor.month, 1), (segment_end - cursor).days + 1)
+        )
         cursor = segment_end + timedelta(days=1)
     return spans

@@ -1,3 +1,8 @@
+"""AI-assisted test generation and revision: OpenAI Codex (OpenAI, n.d.-b).
+
+See ``AI_ASSISTANCE.md`` for scope, prompts and references.
+"""
+
 from beescore import (
     best_period,
     calculate,
@@ -22,6 +27,14 @@ def test_weather_rewards_dry_mild_days():
     assert good > poor
 
 
+def test_missing_flight_assessment_stays_unavailable():
+    days = [
+        {"date": "2026-10-07", "flight_score": None, "temperature": 20, "rain_mm": 0}
+    ]
+    assert weather_score(days) is None
+    assert best_period(days, []) is None
+
+
 def test_distance_score_uses_a_fixed_scale():
     assert distance_score(0) == 100
     assert distance_score(25) == 50
@@ -42,7 +55,9 @@ def test_beescore_is_weighted_and_bounded():
 
 def test_weather_is_context_and_does_not_change_regional_ranking():
     with_weather = calculate(forage=80, flight_weather=10, continuity=60, logistics=90)
-    without_weather = calculate(forage=80, flight_weather=None, continuity=60, logistics=90)
+    without_weather = calculate(
+        forage=80, flight_weather=None, continuity=60, logistics=90
+    )
 
     assert with_weather["score"] == without_weather["score"] == 75
     assert without_weather["components"]["flight_weather"] is None
@@ -69,6 +84,10 @@ def test_continuity_penalises_unstable_flowering():
         [{"score": value} for value in [10, 90, 10, 90, 10, 90, 10]], 60
     )
     assert stable > unstable
+
+
+def test_missing_flowering_keeps_only_the_declared_diversity_share():
+    assert continuity_score([], 50) == 15
 
 
 def test_best_period_reports_the_available_window_length():
@@ -121,3 +140,18 @@ def test_lv95_map_points_convert_back_near_st_gallen():
     lat, lon = _lv95_to_wgs84(2_746_301, 1_255_286)
     assert abs(lat - 47.4321) < 0.001
     assert abs(lon - 9.3780) < 0.001
+
+
+def test_best_period_does_not_bridge_missing_forecast_days():
+    from beescore import best_period
+
+    weather = [
+        {"date": value, "flight_score": 80}
+        for value in ["2026-10-07", "2026-10-09", "2026-10-10"]
+    ]
+    flower = [{"date": day["date"], "score": 60} for day in weather]
+    assert best_period(weather, flower) == {
+        "from": "2026-10-09",
+        "to": "2026-10-10",
+        "days": 2,
+    }

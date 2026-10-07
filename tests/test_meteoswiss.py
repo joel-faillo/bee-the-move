@@ -1,3 +1,8 @@
+"""AI-assisted test generation and revision: OpenAI Codex (OpenAI, n.d.-b).
+
+See ``AI_ASSISTANCE.md`` for scope, prompts and references.
+"""
+
 from services.meteoswiss import MeteoSwissForecastService, _flight_hour_score
 
 
@@ -52,3 +57,16 @@ def test_daily_summary_uses_daylight_hours_and_all_weather_outputs():
     assert result["wind_kmh"] == 10
     assert result["gust_kmh"] == 15
     assert result["radiation_wm2"] == 250
+
+
+def test_missing_weather_inputs_are_not_invented_as_favourable_hours():
+    complete = dict(
+        temperature=22, rain_mm=0, wind_kmh=8, gust_kmh=12, radiation_wm2=300
+    )
+    for field in complete:
+        incomplete = {**complete, field: None}
+        day = MeteoSwissForecastService._summarise_day("2026-10-07", [incomplete])
+        assert day["flight_hours"] == 0
+        assert day["favourable_hours"] == 0
+        assert day["flight_score"] is None
+        assert day["rain_mm"] is None

@@ -1,9 +1,13 @@
 # Contribution matrix
 
-Replace `Member 1` to `Member 5` with the real names and record the final work
-truthfully before producing the video.
+**Project Group 03.03 — Exercise Group 3**
 
-| Work area | Member 1 | Member 2 | Member 3 | Member 4 | Member 5 |
+Danae Benzonelli, Davide Tröhler, Filippo Sorrentino, Gaia Schenal and Joel Faillo.
+
+Record each member's actual final work truthfully before submission. Names
+come from the group's proposal; blank cells do not imply any completed role.
+
+| Work area | Danae Benzonelli | Davide Tröhler | Filippo Sorrentino | Gaia Schenal | Joel Faillo |
 |---|---|---|---|---|---|
 | Problem and user needs |  |  |  |  |  |
 | Public-data research |  |  |  |  |  |

@@ -4,8 +4,8 @@ The bundled files in ``static/forms`` are unmodified originals downloaded from
 BienenSchweiz and the FSVO/BLV.  These functions only insert data supplied by
 the user.  They do not rewrite clauses, add permissions or replace signatures.
 
-AI assistance citation: OpenAI Codex helped draft this module on 22 September
-2026. The project team must review it and document that use in its submission.
+AI-assisted code generation and revision: OpenAI Codex (OpenAI, n.d.-b).
+See ``AI_ASSISTANCE.md`` for scope, prompts and references.
 """
 
 from __future__ import annotations
@@ -36,14 +36,30 @@ STOCK_CONTROL_LAYOUTS = {
         "office": "Zuständiger Veterinärdienst",
         "inspector": "Zuständiger Bieneninspektor",
         "bee_type": "Bienenvolk (V)",
-        "beekeeper": {"number": (3, 1), "name": (4, 1), "street": (5, 1), "city": (6, 1), "phone": (7, 1), "email": (8, 1), "section": (9, 1)},
+        "beekeeper": {
+            "number": (3, 1),
+            "name": (4, 1),
+            "street": (5, 1),
+            "city": (6, 1),
+            "phone": (7, 1),
+            "email": (8, 1),
+            "section": (9, 1),
+        },
     },
     "fr": {
         "title": "Registre de colonies d’abeilles pour l’année {year}",
         "office": "Service vétérinaire compétent",
         "inspector": "Inspecteur des ruchers compétent",
         "bee_type": "Colonie d’abeilles (C)",
-        "beekeeper": {"number": (4, 1), "name": (5, 1), "street": (6, 1), "city": (7, 1), "phone": (8, 1), "email": (9, 1), "section": (10, 1)},
+        "beekeeper": {
+            "number": (4, 1),
+            "name": (5, 1),
+            "street": (6, 1),
+            "city": (7, 1),
+            "phone": (8, 1),
+            "email": (9, 1),
+            "section": (10, 1),
+        },
     },
     "it": {
         "title": "Controllo degli effettivi delle colonie di api per l’anno {year}",
@@ -51,7 +67,15 @@ STOCK_CONTROL_LAYOUTS = {
         "inspector": "Ispettore degli apiari competente",
         "bee_type": "Colonia di api (C)",
         # The Italian source template has no separate beekeeper-number field.
-        "beekeeper": {"number": None, "name": (4, 1), "street": (5, 1), "city": (6, 1), "phone": (7, 1), "email": (8, 1), "section": (9, 1)},
+        "beekeeper": {
+            "number": None,
+            "name": (4, 1),
+            "street": (5, 1),
+            "city": (6, 1),
+            "phone": (7, 1),
+            "email": (8, 1),
+            "section": (9, 1),
+        },
     },
 }
 
@@ -60,7 +84,7 @@ def fill_land_agreement(data: dict) -> bytes:
     """Return a filled copy of the official BienenSchweiz PDF.
 
     Only unambiguous AcroForm fields are populated. Signature fields and
-    contractual choices that need agreement between the parties stay open.
+    unselected contractual options stay blank; explicit user choices are filled.
     """
     reader = PdfReader(LAND_AGREEMENT_TEMPLATE)
     writer = PdfWriter()
@@ -69,7 +93,9 @@ def fill_land_agreement(data: dict) -> bytes:
     values = {
         "Vereinbarung zwischen": data.get("landowner", ""),
         "Imkerin  Imker": _join(
-            data.get("beekeeper"), data.get("beekeeper_street"), data.get("beekeeper_city")
+            data.get("beekeeper"),
+            data.get("beekeeper_street"),
+            data.get("beekeeper_city"),
         ),
         "Liegenschaft  Parzelle": data.get("parcel", ""),
         "m2 Boden nachfolgend Platz um darauf Bienen zu halten": str(
@@ -132,9 +158,7 @@ def fill_land_agreement(data: dict) -> bytes:
     elif data.get("compensation_period") == "Month":
         values["Monat"] = "/On"
 
-    writer.update_page_form_field_values(
-        writer.pages[0], values, auto_regenerate=False
-    )
+    writer.update_page_form_field_values(writer.pages[0], values, auto_regenerate=False)
     output = BytesIO()
     writer.write(output)
     return output.getvalue()
@@ -153,10 +177,8 @@ def fill_stock_control(data: dict, language: str = "de") -> bytes:
     details = document.tables[0]
     office = data.get("veterinary_office", "")
     inspector = data.get("bee_inspector", "") or "____________________________"
-    details.cell(0, 0).text = (
-        f"{layout['office']}: {office}\n\n"
-        f"{layout['inspector']}: {inspector}"
-    )
+    contact_text = f"{layout['office']}: {office}\n\n{layout['inspector']}: {inspector}"
+    details.cell(0, 0).text = contact_text
 
     # Left side: beekeeper. Right side: the selected destination apiary.
     beekeeper_fields = layout["beekeeper"]
@@ -204,7 +226,9 @@ def _set(table, row: int, column: int, value, font_size: float | None = None) ->
 
 
 def _date(value) -> str:
-    return value.strftime("%d/%m/%Y") if hasattr(value, "strftime") else str(value or "")
+    return (
+        value.strftime("%d/%m/%Y") if hasattr(value, "strftime") else str(value or "")
+    )
 
 
 def _join(*parts) -> str:
